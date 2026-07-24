@@ -1,7 +1,10 @@
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default async function Home() {
 
   return (
-    <div className="">home</div>
+    <div className="">home
+    <ModeToggle/>
+    </div>
   );
 }
