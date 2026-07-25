@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Bell, Search } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 const pageTitles: Record<string, { title: string; description: string }> = {
   "/dashboard": {
@@ -25,7 +26,7 @@ export function Header() {
   const page = pageTitles[pathname] ?? { title: "WananchiAI", description: "" };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
+    <header className="flex h-14 items-center justify-between border-b border-border bg-background px-4 md:px-6">
       {/* Page title */}
       <div className="leading-tight">
         <h1 className="text-sm font-semibold text-foreground">{page.title}</h1>
@@ -37,7 +38,7 @@ export function Header() {
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 md:gap-2">
         <Button variant="outline" size="icon-sm">
           <Search className="size-3.5" />
           <span className="sr-only">Search</span>
@@ -47,8 +48,9 @@ export function Header() {
           <span className="sr-only">Notifications</span>
         </Button>
         <ModeToggle />
-        <Button size="sm" asChild>
-          <a href="/submit">+ Submit</a>
+        {/* Only show on desktop — bottom nav handles it on mobile */}
+        <Button size="sm" className="hidden md:inline-flex" asChild>
+          <Link href="/submit">+ Submit</Link>
         </Button>
       </div>
     </header>

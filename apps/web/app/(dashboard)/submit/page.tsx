@@ -78,21 +78,21 @@ export default function SubmitPage() {
         <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Report type
         </label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 xs:grid-cols-3">
           {TYPE_OPTIONS.map(({ value, icon: Icon, label, desc }) => (
             <button
               key={value}
               onClick={() => setType(value)}
               className={cn(
-                "flex flex-col items-start gap-1.5 rounded-xl border p-3.5 text-left transition-colors",
+                "flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors xs:flex-col xs:items-start xs:gap-1.5",
                 type === value
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-border bg-card text-card-foreground hover:border-primary/40 hover:bg-muted/50"
               )}
             >
-              <Icon className={cn("size-4", type === value ? "text-primary" : "text-muted-foreground")} />
+              <Icon className={cn("size-4 shrink-0", type === value ? "text-primary" : "text-muted-foreground")} />
               <span className="text-xs font-semibold">{label}</span>
-              <span className="text-[10px] leading-tight text-muted-foreground">{desc}</span>
+              <span className="hidden text-[10px] leading-tight text-muted-foreground xs:block">{desc}</span>
             </button>
           ))}
         </div>

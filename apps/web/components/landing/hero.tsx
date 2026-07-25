@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 
 export function Hero() {
   return (
-    <section className="border-b border-border bg-background px-6 py-20 text-center">
+    <section className="border-b border-border bg-background px-4 py-14 text-center sm:px-6 sm:py-20">
       {/* Badge */}
-      <div className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1">
+      <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1">
         <span className="size-1.5 rounded-full bg-primary" />
         <span className="text-xs font-medium text-muted-foreground">
           Powered by Gemma 4 · Kenya 2027
@@ -14,35 +14,35 @@ export function Hero() {
       </div>
 
       {/* Heading */}
-      <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl">
+      <h1 className="mx-auto max-w-3xl text-3xl font-bold leading-tight tracking-tight text-foreground sm:text-4xl lg:text-5xl">
         Every citizen voice shapes{" "}
         <span className="text-primary">community decisions</span>
       </h1>
 
-      <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
+      <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground sm:mt-5 sm:text-base">
         Submit a concern via voice, text, or photo in English or Kiswahili. AI
         clusters reports, scores urgency, and delivers evidence-backed
         recommendations straight to MPs and county governments.
       </p>
 
-      {/* CTA buttons */}
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <Button size="lg" >
-          <Link href="/submit" className="flex flex-row gap-1 flex-nowrap items-center">
+      {/* CTA buttons — stack on mobile, row on sm+ */}
+      <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:mt-8 sm:flex-row">
+        <Button size="lg"  className="w-full sm:w-auto">
+          <Link href="/submit" className="flex items-center justify-center gap-2">
             <MapPin className="size-4" />
             Report an Issue
           </Link>
         </Button>
-        <Button variant="outline" size="lg" >
-          <Link href="/dashboard" className="flex flex-row gap-1 flex-nowrap items-center">
+        <Button variant="outline" size="lg"  className="w-full sm:w-auto">
+          <Link href="/dashboard" className="flex items-center justify-center gap-2">
             View Dashboard
             <ArrowRight className="size-4" />
           </Link>
         </Button>
       </div>
 
-      {/* Channel pills */}
-      <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+      {/* Channel pills — wraps on mobile, row on sm+ */}
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
         {[
           { icon: Mic, label: "Voice Note" },
           { icon: MessageSquare, label: "SMS / Text" },

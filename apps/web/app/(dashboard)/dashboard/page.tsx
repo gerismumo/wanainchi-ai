@@ -122,8 +122,8 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Category breakdown + recent reports */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      {/* Category breakdown + recent reports — stacked on mobile, side-by-side on lg */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* Recent reports list */}
         <div>
           <div className="mb-3 flex items-center justify-between">

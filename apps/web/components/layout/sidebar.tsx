@@ -13,28 +13,17 @@ import {
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Reports",
-    href: "/reports",
-    icon: FileText,
-  },
-  {
-    label: "Submit Report",
-    href: "/submit",
-    icon: PlusCircle,
-  },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Reports", href: "/reports", icon: FileText },
+  { label: "Submit Report", href: "/submit", icon: PlusCircle },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-border bg-sidebar">
+    // Hidden on mobile — navigation handled by BottomNav instead
+    <aside className="hidden md:flex h-full w-60 flex-col border-r border-border bg-sidebar">
       {/* Brand */}
       <div className="flex items-center gap-2.5 border-b border-border px-5 py-4">
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
@@ -67,7 +56,9 @@ export function Sidebar() {
               <Icon
                 className={cn(
                   "size-4 shrink-0",
-                  active ? "text-sidebar-primary" : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
+                  active
+                    ? "text-sidebar-primary"
+                    : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
                 )}
               />
               <span className="flex-1">{label}</span>

@@ -1,8 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import { ReportRow, type ReportRowData } from "@/components/dashboard/report-row";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
-// Mock data — all report statuses represented
+// Mock data
 // ---------------------------------------------------------------------------
 const allReports: ReportRowData[] = [
   {
@@ -95,31 +99,76 @@ const allReports: ReportRowData[] = [
   },
 ];
 
-const STATUS_FILTERS = ["All", "received", "processing", "reviewed", "in_progress", "resolved"];
-const CATEGORY_FILTERS = ["All", "water", "roads", "health", "security", "education", "electricity", "sanitation"];
+type StatusFilter = "all" | "received" | "processing" | "reviewed" | "in_progress" | "resolved";
+type CategoryFilter = "all" | "water" | "roads" | "health" | "security" | "education" | "electricity" | "sanitation";
+
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "received", label: "Received" },
+  { value: "processing", label: "Processing" },
+  { value: "reviewed", label: "Reviewed" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "resolved", label: "Resolved" },
+];
+
+const CATEGORY_FILTERS: { value: CategoryFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "water", label: "Water" },
+  { value: "roads", label: "Roads" },
+  { value: "health", label: "Health" },
+  { value: "security", label: "Security" },
+  { value: "education", label: "Education" },
+  { value: "electricity", label: "Electricity" },
+  { value: "sanitation", label: "Sanitation" },
+];
 
 export default function ReportsPage() {
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [category, setCategory] = useState<CategoryFilter>("all");
+
+  const filtered = allReports.filter((r) => {
+    const matchStatus = status === "all" || r.status === status;
+    const matchCategory = category === "all" || r.category === category;
+    return matchStatus && matchCategory;
+  });
+
   return (
-    <div className="space-y-5">
-      {/* Filter bar */}
-      <div className="flex flex-wrap gap-2">
-        <div className="flex flex-wrap gap-1.5">
-          {STATUS_FILTERS.map((s) => (
+    <div className="space-y-4">
+      {/* Status filter — horizontal scroll on mobile */}
+      <div className="-mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {STATUS_FILTERS.map(({ value, label }) => (
             <button
-              key={s}
-              className="rounded-lg border border-border bg-card px-3 py-1 text-xs font-medium text-card-foreground transition-colors first:bg-primary first:text-primary-foreground hover:bg-muted"
+              key={value}
+              onClick={() => setStatus(value)}
+              className={cn(
+                "shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                status === value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-card-foreground hover:bg-muted"
+              )}
             >
-              {s === "All" ? s : s.replace("_", " ")}
+              {label}
             </button>
           ))}
         </div>
-        <div className="ml-auto flex flex-wrap gap-1.5">
-          {CATEGORY_FILTERS.slice(1).map((c) => (
+      </div>
+
+      {/* Category filter — horizontal scroll on mobile */}
+      <div className="-mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {CATEGORY_FILTERS.map(({ value, label }) => (
             <button
-              key={c}
-              className="rounded-lg border border-border bg-card px-3 py-1 text-xs font-medium capitalize text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              key={value}
+              onClick={() => setCategory(value)}
+              className={cn(
+                "shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                category === value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
             >
-              {c}
+              {label}
             </button>
           ))}
         </div>
@@ -127,15 +176,30 @@ export default function ReportsPage() {
 
       {/* Count */}
       <p className="text-xs text-muted-foreground">
-        Showing <span className="font-medium text-foreground">{allReports.length}</span> reports
+        Showing{" "}
+        <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
+        {allReports.length} reports
       </p>
 
       {/* List */}
-      <div className="space-y-2">
-        {allReports.map((r) => (
-          <ReportRow key={r.id} report={r} />
-        ))}
-      </div>
+      {filtered.length > 0 ? (
+        <div className="space-y-2">
+          {filtered.map((r) => (
+            <ReportRow key={r.id} report={r} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card py-16 text-center">
+          <p className="text-sm font-medium text-foreground">No reports match</p>
+          <p className="text-xs text-muted-foreground">Try a different status or category filter</p>
+          <button
+            onClick={() => { setStatus("all"); setCategory("all"); }}
+            className="mt-2 text-xs text-primary hover:underline"
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
 
       {/* Pagination stub */}
       <div className="flex items-center justify-between border-t border-border pt-4">
