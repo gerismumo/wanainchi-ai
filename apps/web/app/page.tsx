@@ -1,10 +1,82 @@
+import Link from "next/link";
+import { MapPin, ArrowRight } from "lucide-react";
+import { Hero } from "@/components/landing/hero";
+import { Features } from "@/components/landing/features";
+import { HowItWorks } from "@/components/landing/how-it-works";
 import { ModeToggle } from "@/components/mode-toggle";
+import { Button } from "@/components/ui/button";
 
-export default async function Home() {
-
+export default function LandingPage() {
   return (
-    <div className="">home
-    <ModeToggle/>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Nav */}
+      <nav className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur">
+        <div className="flex items-center gap-2">
+          <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
+            <MapPin className="size-3.5 text-primary-foreground" />
+          </div>
+          <span className="text-sm font-semibold">WananchiAI</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <ModeToggle />
+          <Button variant="outline" size="sm" >
+            <Link href="/dashboard">Dashboard</Link>
+          </Button>
+          <Button size="sm" >
+            <Link href="/submit" className="flex flex-row gap-1 flex-nowrap items-center" >
+              Report Issue
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </Button>
+        </div>
+      </nav>
+
+      {/* Sections */}
+      <Hero />
+      <Features />
+      <HowItWorks />
+
+      {/* CTA footer section */}
+      <section className="border-b border-border bg-muted/30 px-6 py-16 text-center">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary">
+          Kenya 2027 Elections
+        </p>
+        <h2 className="mx-auto max-w-2xl text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Shift public participation from promises to data
+        </h2>
+        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+          Every report submitted today becomes part of the evidence base that
+          holds leaders accountable. Your voice is the data.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Button size="lg" >
+            <Link href="/submit" className="flex flex-row flex-nowrap items-center gap-3">
+              <MapPin className="size-4" />
+              Submit Your First Report
+            </Link>
+          </Button>
+          <Button variant="outline" size="lg" className="flex flex-row flex-nowrap items" >
+            <Link href="/dashboard">
+              Explore the Dashboard
+            </Link>
+          </Button>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-border px-6 py-6">
+        <div className="flex items-center gap-2">
+          <div className="flex size-6 items-center justify-center rounded bg-primary">
+            <MapPin className="size-3 text-primary-foreground" />
+          </div>
+          <span className="text-xs font-semibold text-foreground">WananchiAI</span>
+          <span className="text-xs text-muted-foreground">· Civic Intelligence Platform</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Powered by Gemma 4 · Built for Kenya
+        </p>
+      </footer>
     </div>
   );
 }
