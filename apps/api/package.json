@@ -12,16 +12,29 @@
     "test:watch": "jest --watch",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\""
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "migrate:make": "knex migrate:make --knexfile src/database/knexfile.ts",
+    "migrate:latest": "knex migrate:latest --knexfile src/database/knexfile.ts",
+    "migrate:rollback": "knex migrate:rollback --knexfile src/database/knexfile.ts",
+    "migrate:rollback:all": "knex migrate:rollback --all --knexfile src/database/knexfile.ts",
+    "migrate:status": "knex migrate:status --knexfile src/database/knexfile.ts",
+    "migrate:up": "knex migrate:up --knexfile src/database/knexfile.ts",
+    "migrate:down": "knex migrate:down --knexfile src/database/knexfile.ts",
+    "seed:make": "knex seed:make --knexfile src/database/knexfile.ts",
+    "seed:run": "knex seed:run --knexfile src/database/knexfile.ts",
+    "db:reset": "pnpm run migrate:rollback:all && pnpm run migrate:latest && pnpm run seed:run"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.11",
     "@nestjs/core": "^11.1.11",
     "@nestjs/platform-express": "^11.1.11",
     "@repo/api": "workspace:*",
+    "dotenv": "^17.4.2",
+    "escape-html": "^1.0.3",
+    "knex": "^3.3.0",
+    "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "escape-html": "^1.0.3"
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
