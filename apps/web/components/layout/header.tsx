@@ -49,7 +49,7 @@ export function Header() {
         </Button>
         <ModeToggle />
         {/* Only show on desktop — bottom nav handles it on mobile */}
-        <Button size="sm" className="hidden md:inline-flex" asChild>
+        <Button size="sm" className="hidden md:inline-flex">
           <Link href="/submit">+ Submit</Link>
         </Button>
       </div>
