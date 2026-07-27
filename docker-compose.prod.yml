@@ -22,8 +22,8 @@ services:
     restart: always
     # env_file:
     #   - /home/apps/primecell/admin/.env
-    depends_on:
-      - api
+    # depends_on:
+    #   - api
     expose:
       - '3001'
     networks:
