@@ -42,6 +42,107 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw('create extension if not exists "pgcrypto"');
 
   // ---------------------------------------------------------
+  // roles / users / user_roles
+  // Role-based access replaces the old single `role` enum column —
+  // a user can now hold more than one role (e.g. a ward officer who
+  // is also a county_admin during a transition), and new roles can
+  // be added without a migration.
+  // ---------------------------------------------------------
+  await knex.schema.createTable("roles", (t) => {
+    t.uuid("id").primary().defaultTo(knex.raw("gen_random_uuid()"));
+    t.string("name").notNullable().unique(); // 'citizen' | 'ward_officer' | 'constituency_admin' | 'county_admin' | 'mp_office' | 'super_admin' | ...
+    t.string("description").nullable();
+    t.boolean("is_system_role").defaultTo(false); // true = seeded, can't be renamed/deleted from the UI
+    t.timestamps(true, true);
+  });
+
+  await knex.schema.createTable("users", (t) => {
+    t.uuid("id").primary().defaultTo(knex.raw("gen_random_uuid()"));
+    t.text("first_name").notNullable();
+    t.text("last_name").notNullable();
+    t.string("email").notNullable().unique();
+    t.text("phone_number").nullable();
+    t.text("avatar_url").nullable();
+    t.string("password_hash").notNullable();
+    t.integer("failed_attempts").defaultTo(0);
+    t.timestamp("locked_until").nullable(); // set once failed_attempts trips a threshold
+    t.timestamp("last_login_at").nullable();
+    t.boolean("is_active").defaultTo(true);
+    t.boolean("is_email_verified").defaultTo(false);
+
+    addLocationColumns(t);
+
+    // Self-referencing: who provisioned this account (e.g. a county_admin
+    // inviting a ward_officer). Null for the first/seed admin.
+    t.uuid("added_by")
+      .nullable()
+      .references("id")
+      .inTable("users")
+      .onDelete("SET NULL");
+
+    t.timestamps(true, true);
+    t.index(["is_active"], "idx_users_active");
+  });
+
+  await knex.schema.createTable("user_roles", (t) => {
+    t.uuid("user_id")
+      .notNullable()
+      .references("id")
+      .inTable("users")
+      .onDelete("CASCADE");
+    t.uuid("role_id")
+      .notNullable()
+      .references("id")
+      .inTable("roles")
+      .onDelete("CASCADE");
+    t.primary(["user_id", "role_id"]);
+    t.index(["role_id"], "idx_user_roles_role");
+  });
+
+  // ---------------------------------------------------------
+  // password_resets
+  // Short-lived, single-use tokens. Only the hash is stored so a
+  // leaked table doesn't hand out working reset links.
+  // ---------------------------------------------------------
+  await knex.schema.createTable("password_resets", (t) => {
+    t.uuid("id").primary().defaultTo(knex.raw("gen_random_uuid()"));
+    t.uuid("user_id")
+      .notNullable()
+      .references("id")
+      .inTable("users")
+      .onDelete("CASCADE");
+    t.string("token_hash").notNullable();
+    t.timestamp("expires_at").notNullable();
+    t.boolean("used").defaultTo(false);
+    t.timestamps(true, true);
+    t.index(["user_id"], "idx_password_resets_user");
+    t.index(["expires_at"], "idx_password_resets_expires");
+  });
+
+  // ---------------------------------------------------------
+  // user_login_history
+  // Append-only audit trail — powers both the "recent activity"
+  // panel on a user's profile and lockout/anomaly detection
+  // (repeated is_successful = false from new countries, etc).
+  // ---------------------------------------------------------
+  await knex.schema.createTable("user_login_history", (t) => {
+    t.uuid("id").primary().defaultTo(knex.raw("gen_random_uuid()"));
+    t.uuid("user_id")
+      .notNullable()
+      .references("id")
+      .inTable("users")
+      .onDelete("CASCADE");
+    t.string("ip_address", 45).nullable(); // fits IPv6
+    t.string("country", 2).nullable(); // ISO 3166-1 alpha-2
+    t.string("city").nullable();
+    t.boolean("is_successful").defaultTo(true);
+    t.text("user_agent").nullable();
+    t.timestamp("created_at").defaultTo(knex.fn.now());
+    t.index(["user_id"], "idx_login_history_user");
+    t.index(["created_at"], "idx_login_history_created_at");
+  });
+
+  // ---------------------------------------------------------
   // devices
   // Anonymous-identity table. No login required: the frontend
   // generates a persistent client_uuid (cookie/localStorage) on
@@ -68,39 +169,6 @@ export async function up(knex: Knex): Promise<void> {
     t.timestamp("last_seen_at", { useTz: true }).notNullable().defaultTo(knex.fn.now());
 
     t.check("client_uuid is not null or fingerprint_hash is not null");
-  });
-
-  // ---------------------------------------------------------
-  // users
-  // Verified citizens and government officials. Anonymous
-  // citizens never get a row here — they're a device, not a user.
-  // ---------------------------------------------------------
-  await knex.schema.createTable("users", (t) => {
-    t.uuid("id").primary().defaultTo(knex.raw("gen_random_uuid()"));
-
-    t.string("phone").unique();
-    t.string("email").unique();
-    t.string("auth_provider"); // 'phone_otp' | 'email_otp' | 'google'
-
-    t.enum("role", [
-      "citizen",
-      "ward_officer",
-      "constituency_admin",
-      "county_admin",
-      "mp_office",
-      "super_admin",
-    ])
-      .notNullable()
-      .defaultTo("citizen");
-
-    addLocationColumns(t);
-
-    t.string("display_name");
-    t.timestamp("created_at", { useTz: true }).notNullable().defaultTo(knex.fn.now());
-
-    t.index("role");
-    t.index(["location_type", "location_code"]);
-    t.index("county_code");
   });
 
   // Now that users exists, wire up the FK we deferred above.
@@ -305,9 +373,33 @@ export async function up(knex: Knex): Promise<void> {
     group by d.id, d.linked_user_id, d.trust_score
     having count(r.id) > 1
   `);
+
+  // ---------------------------------------------------------
+  // Staff roster view — one row per admin/officer user with their
+  // role names flattened into an array, so the admin UI doesn't
+  // have to join user_roles/roles itself for a simple listing.
+  // ---------------------------------------------------------
+  await knex.raw(`
+    create view v_user_roster as
+    select
+      u.id as user_id,
+      u.first_name,
+      u.last_name,
+      u.email,
+      u.is_active,
+      u.last_login_at,
+      u.county_code,
+      u.constituency_code,
+      array_agg(r.name order by r.name) as role_names
+    from users u
+    left join user_roles ur on ur.user_id = u.id
+    left join roles r on r.id = ur.role_id
+    group by u.id
+  `);
 }
 
 export async function down(knex: Knex): Promise<void> {
+  await knex.raw(`drop view if exists v_user_roster`);
   await knex.raw(`drop view if exists v_returning_devices`);
   await knex.raw(`drop view if exists v_top_categories`);
   await knex.raw(`drop view if exists v_county_summary`);
@@ -322,8 +414,13 @@ export async function down(knex: Knex): Promise<void> {
   await knex.schema.alterTable("devices", (t) => {
     t.dropForeign(["linked_user_id"]);
   });
+
+  await knex.schema.dropTableIfExists("user_login_history");
+  await knex.schema.dropTableIfExists("password_resets");
+  await knex.schema.dropTableIfExists("user_roles");
   await knex.schema.dropTableIfExists("users");
   await knex.schema.dropTableIfExists("devices");
+  await knex.schema.dropTableIfExists("roles");
 
   await knex.raw('drop extension if exists "pgcrypto"');
 }

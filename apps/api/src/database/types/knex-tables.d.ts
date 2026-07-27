@@ -11,6 +11,7 @@ import { Knex } from 'knex';
 //                      for OID 1700 if you'd rather get numbers back.
 // - timestamptz     -> Date (node-postgres parses these automatically)
 // - jsonb           -> parsed automatically into the shape you gave it
+// - bigint count(*) -> string, since JS numbers can't safely hold it
 // -----------------------------------------------------------------
 
 type LocationType = 'county' | 'constituency' | 'ward' | 'locality' | 'area';
@@ -35,7 +36,92 @@ interface LocationFields {
 // are required, and all default to null.
 type LocationFieldsInsert = Partial<LocationFields>;
 
+// Well-known role names. Not an exhaustive union at the DB level (the
+// roles table has no check constraint — new roles can be created
+// without a migration), but useful as an autocomplete hint at call sites.
+export type WellKnownRoleName =
+  | 'citizen'
+  | 'ward_officer'
+  | 'constituency_admin'
+  | 'county_admin'
+  | 'mp_office'
+  | 'super_admin';
+
 declare module 'knex/types/tables' {
+  // ---------------------------------------------------------------
+  // roles
+  // ---------------------------------------------------------------
+  interface Role {
+    id: string;
+    name: string;
+    description: string | null;
+    is_system_role: boolean;
+    created_at: Date;
+    updated_at: Date;
+  }
+
+  // ---------------------------------------------------------------
+  // users
+  // Role now lives in user_roles (many-to-many) instead of a single
+  // enum column — a user can hold more than one role at once.
+  // ---------------------------------------------------------------
+  interface User extends LocationFields {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone_number: string | null;
+    avatar_url: string | null;
+    password_hash: string;
+    failed_attempts: number;
+    locked_until: Date | null;
+    last_login_at: Date | null;
+    is_active: boolean;
+    is_email_verified: boolean;
+    added_by: string | null; // self-referencing FK — who provisioned this account
+    created_at: Date;
+    updated_at: Date;
+  }
+
+  // ---------------------------------------------------------------
+  // user_roles
+  // Pure join table — composite primary key, no surrogate id and no
+  // timestamps of its own.
+  // ---------------------------------------------------------------
+  interface UserRole {
+    user_id: string;
+    role_id: string;
+  }
+
+  // ---------------------------------------------------------------
+  // password_resets
+  // ---------------------------------------------------------------
+  interface PasswordReset {
+    id: string;
+    user_id: string;
+    token_hash: string;
+    expires_at: Date;
+    used: boolean;
+    created_at: Date;
+    updated_at: Date;
+  }
+
+  // ---------------------------------------------------------------
+  // user_login_history
+  // Append-only — no updated_at, since a login event never changes
+  // after the fact.
+  // ---------------------------------------------------------------
+  interface UserLoginHistory {
+    id: string;
+    user_id: string;
+    ip_address: string | null;
+    country: string | null; // ISO 3166-1 alpha-2
+    city: string | null;
+    is_successful: boolean;
+    user_agent: string | null;
+    created_at: Date;
+  }
+
   // ---------------------------------------------------------------
   // devices
   // ---------------------------------------------------------------
@@ -50,25 +136,6 @@ declare module 'knex/types/tables' {
     submission_count: number;
     first_seen_at: Date;
     last_seen_at: Date;
-  }
-
-  // ---------------------------------------------------------------
-  // users
-  // ---------------------------------------------------------------
-  interface User extends LocationFields {
-    id: string;
-    phone: string | null;
-    email: string | null;
-    auth_provider: string | null;
-    role:
-      | 'citizen'
-      | 'ward_officer'
-      | 'constituency_admin'
-      | 'county_admin'
-      | 'mp_office'
-      | 'super_admin';
-    display_name: string | null;
-    created_at: Date;
   }
 
   // ---------------------------------------------------------------
@@ -185,7 +252,54 @@ declare module 'knex/types/tables' {
     last_submission_at: Date;
   }
 
+  // array_agg comes back as a JS array already (node-postgres parses
+  // Postgres arrays); a user with no roles yields [null] rather than
+  // [] because of the left join, so callers should filter nulls out.
+  interface UserRosterView {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    is_active: boolean;
+    last_login_at: Date | null;
+    county_code: string | null;
+    constituency_code: string | null;
+    role_names: (string | null)[];
+  }
+
   interface Tables {
+    roles: Knex.CompositeTableType<
+      Role,
+      Pick<Role, 'name'> & Partial<Omit<Role, 'id' | 'name' | 'created_at' | 'updated_at'>>,
+      Partial<Omit<Role, 'id'>>
+    >;
+
+    users: Knex.CompositeTableType<
+      User,
+      Pick<User, 'first_name' | 'last_name' | 'email' | 'password_hash'> &
+        Partial<Omit<User, 'id' | 'first_name' | 'last_name' | 'email' | 'password_hash' | 'created_at' | 'updated_at'>>,
+      Partial<Omit<User, 'id'>>
+    >;
+
+    user_roles: Knex.CompositeTableType<
+      UserRole,
+      UserRole, // both columns form the composite key — both required on insert
+      never // no non-key columns to update; delete-and-reinsert instead
+    >;
+
+    password_resets: Knex.CompositeTableType<
+      PasswordReset,
+      Pick<PasswordReset, 'user_id' | 'token_hash' | 'expires_at'> &
+        Partial<Omit<PasswordReset, 'id' | 'user_id' | 'token_hash' | 'expires_at' | 'created_at' | 'updated_at'>>,
+      Partial<Omit<PasswordReset, 'id'>>
+    >;
+
+    user_login_history: Knex.CompositeTableType<
+      UserLoginHistory,
+      Pick<UserLoginHistory, 'user_id'> & Partial<Omit<UserLoginHistory, 'id' | 'user_id' | 'created_at'>>,
+      Partial<Omit<UserLoginHistory, 'id'>>
+    >;
+
     devices: Knex.CompositeTableType<
       Device,
       // client_uuid/fingerprint_hash: at least one is required by the
@@ -193,12 +307,6 @@ declare module 'knex/types/tables' {
       // so both stay optional here; enforce it in a service-layer guard.
       Partial<Omit<Device, 'id' | 'first_seen_at' | 'last_seen_at' | 'trust_score' | 'submission_count'>>,
       Partial<Omit<Device, 'id'>>
-    >;
-
-    users: Knex.CompositeTableType<
-      User,
-      Partial<Omit<User, 'id' | 'created_at'>>,
-      Partial<Omit<User, 'id'>>
     >;
 
     reports: Knex.CompositeTableType<
@@ -242,5 +350,6 @@ declare module 'knex/types/tables' {
     v_county_summary: Knex.CompositeTableType<CountySummaryView, never, never>;
     v_top_categories: Knex.CompositeTableType<TopCategoriesView, never, never>;
     v_returning_devices: Knex.CompositeTableType<ReturningDevicesView, never, never>;
+    v_user_roster: Knex.CompositeTableType<UserRosterView, never, never>;
   }
 }

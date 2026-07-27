@@ -70,8 +70,8 @@ export const ENV: EnvConfig = {
   DB_NAME_TEST: process.env.DB_NAME_TEST,
   DB_NAME_DEV: process.env.DB_NAME_DEV,
 
-  ADMIN_FIRST_NAME:process.env.ADMIN_FIRST_NAME,
-  ADMIN_LAST_NAME:process.env.ADMIN_LAST_NAME,
+  ADMIN_FIRST_NAME: process.env.ADMIN_FIRST_NAME,
+  ADMIN_LAST_NAME: process.env.ADMIN_LAST_NAME,
   ADMIN_EMAIL: required('ADMIN_EMAIL'),
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
   ADMIN_PHONE: process.env.ADMIN_PHONE,
@@ -91,13 +91,9 @@ export const ENV: EnvConfig = {
   SMTP_USER: required('SMTP_USER'),
   SMTP_PASS: required('SMTP_PASS'),
   SMTP_SECURE: (process.env.SMTP_SECURE ?? 'false').toLowerCase() === 'true',
-  RESEND_API_KEY:required('RESEND_API_KEY'),
-  RESEND_FROM_EMAIL:required('RESEND_FROM_EMAIL'),
+  RESEND_API_KEY: required('RESEND_API_KEY'),
+  RESEND_FROM_EMAIL: required('RESEND_FROM_EMAIL'),
   CORS_ORIGINS: required('CORS_ORIGINS'),
   CORS_REGEX_ORIGINS: required('CORS_REGEX_ORIGINS'),
   CORS_DEV_ORIGINS: process.env.CORS_DEV_ORIGINS,
-  GOOGLE_SERVICE_ACCOUNT_EMAIL: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-  GOOGLE_CALENDAR_ID: process.env.GOOGLE_CALENDAR_ID
-
 } as const;

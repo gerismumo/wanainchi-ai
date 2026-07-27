@@ -49,7 +49,4 @@ export type EnvConfig = {
   CORS_ORIGINS: string;
   CORS_REGEX_ORIGINS: string;
   CORS_DEV_ORIGINS?: string;
-  GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
-  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
-  GOOGLE_CALENDAR_ID?: string;
 };
