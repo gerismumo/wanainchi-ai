@@ -12,8 +12,7 @@ concurrency:
 env:
   # Centralized so you only edit paths in one place.
   COMPOSE_ENV_FILES: >-
-    # --env-file /home/apps/primecell/.env
-    # --env-file /home/apps/primecell/admin/.env
+    --env-file /home/apps/wanainchiai/web/.env
 
 jobs:
   # STAGE 1: Build & verify -- does NOT touch the running app at all.
