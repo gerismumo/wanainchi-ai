@@ -1,0 +1,122 @@
+name: CI/CD Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false   # never cancel a deploy mid-flight
+
+env:
+  # Centralized so you only edit paths in one place.
+  COMPOSE_ENV_FILES: >-
+    # --env-file /home/apps/primecell/.env
+    # --env-file /home/apps/primecell/admin/.env
+
+jobs:
+  # STAGE 1: Build & verify -- does NOT touch the running app at all.
+  # If this fails, the live app is completely untouched.
+  build-and-test:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate compose file
+        run: |
+          docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml config -q
+
+      - name: Build images (tagged, not deployed yet)
+        run: |
+          docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml build
+
+      # Optional but recommended: run your test suite against the built
+      # image before it ever gets near production. Uncomment/adjust:
+      # - name: Run tests
+      #   run: docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml run --rm app npm test
+
+  # STAGE 2: Deploy -- only runs if build-and-test succeeded.
+  # Uses `up -d` (not down-then-up) so compose only recreates the
+  # containers whose image actually changed, minimizing the gap.
+  deploy:
+    needs: build-and-test
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Record current image IDs (for rollback)
+        run: |
+          docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml images -q > /tmp/previous_image_ids.txt || true
+
+      - name: Build new images
+        run: |
+          docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml build
+
+      - name: Deploy new containers (rolling, no full teardown)
+        run: |
+          docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml up -d --remove-orphans
+
+      - name: Wait for app to become healthy
+        id: healthcheck
+        run: |
+          # No dedicated /health route yet, so we check two things instead:
+          #   1. The container(s) are actually running (not crashed/restarting)
+          #   2. The app port responds to a basic HTTP request
+          # CHANGE the port/path below to match your app.
+          URL="http://localhost:3000/"
+          MAX_ATTEMPTS=15
+          SLEEP_SECONDS=4
+
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            BAD_STATE=$(docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml ps --format json \
+              | grep -c '"State":"restarting"\|"State":"exited"' || true)
+
+            if [ "$BAD_STATE" != "0" ]; then
+              echo "Attempt $i/$MAX_ATTEMPTS: a container is exited/restarting, waiting ${SLEEP_SECONDS}s..."
+              sleep $SLEEP_SECONDS
+              continue
+            fi
+
+            if curl -fsS "$URL" > /dev/null 2>&1; then
+              echo "App is up and responding after $i attempt(s)."
+              exit 0
+            fi
+
+            echo "Attempt $i/$MAX_ATTEMPTS: containers running but app not responding yet, waiting ${SLEEP_SECONDS}s..."
+            sleep $SLEEP_SECONDS
+          done
+
+          echo "App failed to come up cleanly after $MAX_ATTEMPTS attempts."
+          docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml ps
+          docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml logs --tail=50
+          exit 1
+
+      - name: Rollback on failed health check
+        if: failure() && steps.healthcheck.outcome == 'failure'
+        run: |
+          echo "Rolling back to previous working containers..."
+          docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml down --remove-orphans
+
+          if [ -s /tmp/previous_image_ids.txt ]; then
+            docker compose $COMPOSE_ENV_FILES -f docker-compose.prod.yml up -d --remove-orphans
+          fi
+
+          echo "Rollback attempted. Investigate the failed build before retrying."
+          exit 1
+
+      - name: Prune old build cache (only after a successful deploy)
+        if: success()
+        run: docker builder prune -af
+
+      - name: Prune unused images/containers/volumes (only after success)
+        if: success()
+        run: |
+          docker image prune -af
+          docker container prune -f
+          docker volume prune -f

@@ -1,0 +1,74 @@
+services:
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/api/Dockerfile
+  #   container_name: primecell_api
+  #   expose:
+  #     - '3000'
+  #   restart: always
+  #   env_file:
+  #     - /home/apps/primecell/api/.env
+  #   networks:
+  #     - app-network
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: wanainchai_web
+    restart: always
+    # env_file:
+    #   - /home/apps/primecell/admin/.env
+    depends_on:
+      - api
+    expose:
+      - '3001'
+    networks:
+      - app-network
+
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: primecell_db
+  #   env_file:
+  #     - /home/apps/primecell/.env
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #   volumes:
+  #     - primecell_postgres_data:/var/lib/postgresql/data
+  #     - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/00_init-databases.sql:ro
+  #   ports:
+  #    - "5436:5432"
+  #   networks:
+  #     - app-network
+
+  # minio:
+  #   image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+  #   container_name: primecell_minio
+  #   env_file:
+  #     - /home/apps/primecell/.env
+  #   command: server /data --console-address ":9001"
+  #   restart: always
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  #   volumes:
+  #     - primecell_minio_data:/data
+  #   expose:
+  #     - '9000'
+  #     - '9001'
+  #   networks:
+  #     - app-network
+
+# volumes:
+#   primecell_postgres_data:
+#   primecell_minio_data:
+
+networks:
+  app-network:
+    external: true
