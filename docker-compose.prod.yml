@@ -20,10 +20,8 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: wanainchai_web
     restart: always
-    # env_file:
-    #   - /home/apps/primecell/admin/.env
-    # depends_on:
-    #   - api
+    env_file:
+      - /home/apps/wanainchiai/web/.env
     expose:
       - '3001'
     networks:
