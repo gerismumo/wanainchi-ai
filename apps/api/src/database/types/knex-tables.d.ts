@@ -212,6 +212,11 @@ declare module 'knex/types/tables' {
     created_at: Date;
   }
 
+  /** Insert shape: top_issues accepts a pre-serialized JSON string (required by pg/Knex) */
+  type AiDigestInsert = Omit<AiDigest, 'top_issues'> & {
+    top_issues?: { category: string; count: number; avg_urgency: number }[] | string | null;
+  };
+
   // ---------------------------------------------------------------
   // Views — read-only. Insert/Update are `never` so a stray
   // knex('v_...').insert(...) fails to compile instead of failing
@@ -340,10 +345,10 @@ declare module 'knex/types/tables' {
 
     ai_digests: Knex.CompositeTableType<
       AiDigest,
-      Pick<AiDigest, 'period_start' | 'period_end' | 'summary_text'> &
+      Pick<AiDigestInsert, 'period_start' | 'period_end' | 'summary_text'> &
         LocationFieldsInsert &
-        Partial<Omit<AiDigest, 'id' | 'period_start' | 'period_end' | 'summary_text' | 'created_at'>>,
-      Partial<Omit<AiDigest, 'id'>>
+        Partial<Omit<AiDigestInsert, 'id' | 'period_start' | 'period_end' | 'summary_text' | 'created_at'>>,
+      Partial<Omit<AiDigestInsert, 'id'>>
     >;
 
     v_location_summary: Knex.CompositeTableType<LocationSummaryView, never, never>;

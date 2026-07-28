@@ -6,7 +6,7 @@ import {
   buildPaginationMeta,
   PaginatedResult,
 } from 'src/common/util/pagination.util';
-import { LocationType } from 'src/database/types/knex-tables';
+import { LocationRef, LocationType } from 'src/common/util/location.util';
 
 @Injectable()
 export class DigestsRepository {
@@ -65,20 +65,24 @@ export class DigestsRepository {
   }
 
   async getReportsForPeriod(
-    locationType: string,
-    locationCode: string,
+    locations: LocationRef[],
     periodStart: string,
     periodEnd: string,
   ): Promise<
     Pick<Report, 'category' | 'summary' | 'content_text' | 'urgency_score'>[]
   > {
+    if (locations.length === 0) return [];
+
     const start = `${periodStart} 00:00:00`;
     const end = `${periodEnd} 23:59:59.999`;
 
     return this.knex('reports')
       .select('category', 'summary', 'content_text', 'urgency_score')
-      .where('location_type', locationType)
-      .andWhere('location_code', locationCode)
+      .where((qb) => {
+        for (const { location_type, location_code } of locations) {
+          qb.orWhere({ location_type, location_code });
+        }
+      })
       .andWhere('is_spam', false)
       .andWhereBetween('created_at', [start, end]);
   }

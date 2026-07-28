@@ -124,6 +124,112 @@ export function resolveLocation(type?: LocationType, code?: string): ResolvedLoc
   }
 }
 
+export interface LocationRef {
+  location_type: LocationType;
+  location_code: string;
+}
+
+/**
+ * Given a (type, code) pair, returns every (type, code) pair that belongs
+ * to — or is contained within — that location.
+ *
+ * Examples:
+ *   county/001  → county/001 + all its constituencies + wards + localities + areas
+ *   constituency/001 → constituency/001 + its wards + localities in county + areas in those localities
+ *   ward/001    → ward/001 only (wards are the leaf before areas, areas link by locality string)
+ *   locality/001 → locality/001 + its areas
+ *   area/001    → area/001 only
+ *
+ * Results are deduplicated so the query stays clean even when the package
+ * returns overlapping data.
+ */
+export function expandLocationCodes(type: LocationType, code: string): LocationRef[] {
+  const seen = new Set<string>();
+  const refs: LocationRef[] = [];
+
+  const add = (t: LocationType, c: string) => {
+    const key = `${t}:${c}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    refs.push({ location_type: t, location_code: c });
+  };
+
+  switch (type) {
+    case 'county': {
+      const county = kenyaLocations.getCountyByCode(code);
+      if (!county) break;
+      add('county', county.code);
+
+      const constituencies = kenyaLocations.getConstituenciesByCounty(county.code);
+      for (const c of constituencies) {
+        add('constituency', c.code);
+        for (const w of kenyaLocations.getWardsByConstituency(c.code)) {
+          add('ward', w.code);
+        }
+      }
+
+      for (const loc of kenyaLocations.getLocalitiesByCounty(county.code)) {
+        add('locality', loc.code);
+        for (const area of kenyaLocations.getAreasByLocality(loc.name)) {
+          add('area', area.code);
+        }
+      }
+
+      for (const area of kenyaLocations.getAreasByCounty(county.code)) {
+        add('area', area.code);
+      }
+      break;
+    }
+
+    case 'constituency': {
+      const constituency = kenyaLocations.getConstituencyByCode(code);
+      if (!constituency) break;
+      add('constituency', constituency.code);
+
+      for (const w of kenyaLocations.getWardsByConstituency(constituency.code)) {
+        add('ward', w.code);
+      }
+
+      // Pull localities + areas that belong to the same county and whose
+      // areas fall within wards of this constituency (best-effort — the
+      // package has no direct constituency→locality link).
+      for (const loc of kenyaLocations.getLocalitiesByCounty(constituency.county_code)) {
+        add('locality', loc.code);
+        for (const area of kenyaLocations.getAreasByLocality(loc.name)) {
+          add('area', area.code);
+        }
+      }
+      break;
+    }
+
+    case 'ward': {
+      const ward = kenyaLocations.getWardByCode(code);
+      if (!ward) break;
+      add('ward', ward.code);
+      break;
+    }
+
+    case 'locality': {
+      const locality = kenyaLocations.getLocalityByCode(code);
+      if (!locality) break;
+      add('locality', locality.code);
+      for (const area of kenyaLocations.getAreasByLocality(locality.name)) {
+        add('area', area.code);
+      }
+      break;
+    }
+
+    case 'area': {
+      const area = kenyaLocations.getAreaByCode(code);
+      if (!area) break;
+      add('area', area.code);
+      break;
+    }
+  }
+
+  return refs;
+}
+
 /**
  * Fallback path for reports where the citizen never picked a location on a
  * map/dropdown — Gemma pulls a place name straight out of the free text

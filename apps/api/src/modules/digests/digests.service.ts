@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { DigestsRepository } from './digests.repository';
 import { AiService } from '../ai/ai.service';
-import { resolveLocation } from 'src/common/util/location.util';
+import {
+  expandLocationCodes,
+  resolveLocation,
+} from 'src/common/util/location.util';
 import { GenerateDigestInput } from './digests.types';
 import { LocationType } from 'src/database/types/knex-tables';
 
@@ -28,9 +31,13 @@ export class DigestsService {
       throw new BadRequestException('period_start must be before period_end');
     }
 
-    const reports = await this.repo.getReportsForPeriod(
+    const locations = expandLocationCodes(
       input.location_type,
       input.location_code,
+    );
+
+    const reports = await this.repo.getReportsForPeriod(
+      locations,
       input.period_start,
       input.period_end,
     );
@@ -56,18 +63,20 @@ export class DigestsService {
       categoryCounts,
     );
 
+    const topIssues = aiSummary.topIssues.map(
+      ({ category, count, avgUrgency }) => ({
+        category,
+        count,
+        avg_urgency: avgUrgency,
+      }),
+    );
+
     return this.repo.create({
       ...location,
       period_start: input.period_start,
       period_end: input.period_end,
       summary_text: aiSummary.summaryText,
-      top_issues: aiSummary.topIssues.map(
-        ({ category, count, avgUrgency }) => ({
-          category,
-          count,
-          avg_urgency: avgUrgency,
-        }),
-      ),
+      top_issues: JSON.stringify(topIssues),
       report_count: reports.length,
     });
   }
