@@ -165,9 +165,7 @@ export class ReportsRepository {
       .select(
         'r.*',
         this.knex.raw('count(distinct v.id) as vote_count'),
-        this.knex.raw('count(distinct c.id) as comment_count'),
       )
       .leftJoin('votes as v', 'v.report_id', 'r.id')
-      .leftJoin('comments as c', 'c.report_id', 'r.id');
   }
 }

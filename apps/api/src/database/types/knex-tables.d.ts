@@ -176,16 +176,7 @@ declare module 'knex/types/tables' {
     created_at: Date;
   }
 
-  // ---------------------------------------------------------------
-  // comments
-  // ---------------------------------------------------------------
-  interface Comment {
-    id: string;
-    report_id: string;
-    user_id: string;
-    content: string;
-    created_at: Date;
-  }
+
 
   // ---------------------------------------------------------------
   // abuse_logs
@@ -332,12 +323,6 @@ declare module 'knex/types/tables' {
       // same caveat as devices above.
       Pick<Vote, 'report_id'> & Partial<Omit<Vote, 'id' | 'report_id' | 'created_at'>>,
       Partial<Omit<Vote, 'id'>>
-    >;
-
-    comments: Knex.CompositeTableType<
-      Comment,
-      Pick<Comment, 'report_id' | 'user_id' | 'content'>,
-      Partial<Omit<Comment, 'id'>>
     >;
 
     abuse_logs: Knex.CompositeTableType<
