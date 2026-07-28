@@ -13,9 +13,18 @@ export const deleteUserSchema = z.discriminatedUnion('type', [
     value: pinSchema,
   }),
 ]);
+
 export const updatePasswordSchema = z.object({
   password: strongPassword,
 });
+
+// Shared by userSchema/updateUserSchema — a user carries the same
+// location_type/location_code pair as reports, resolved server-side into
+// the full county/constituency ancestry via resolveLocation().
+const locationFieldsSchema = {
+  location_type: z.enum(['county', 'constituency', 'ward', 'locality', 'area']).optional(),
+  location_code: z.string().optional(),
+};
 
 export const userSchema = z.object({
   first_name: z
@@ -73,6 +82,8 @@ export const userSchema = z.object({
         message: 'At least one role must be selected',
       }),
   ),
+
+  ...locationFieldsSchema,
 });
 
 export const updateUserSchema = z.object({
@@ -130,6 +141,8 @@ export const updateUserSchema = z.object({
       }),
   ),
   avatar_url: z.string().optional(),
+
+  ...locationFieldsSchema,
 });
 
 export type UpdateUserDto = z.infer<typeof updateUserSchema>;

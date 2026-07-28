@@ -97,13 +97,10 @@ export class UsersController {
   ) {
     const dto = userSchema.parse(body);
 
-    const result = await this.service.createUser(
-      {
-        ...dto,
-        ...{ country: req.clientCountry ?? 'KE' },
-      },
-      avatar,
-    );
+    // location_type/location_code now travel in the body itself and are
+    // resolved server-side into the full ancestry — no more falling back
+    // to a geo-IP-derived country here.
+    const result = await this.service.createUser(dto, avatar);
 
     res.success(result);
   }

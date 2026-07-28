@@ -8,13 +8,14 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { UsersRepository } from './users.repository';
-import { IUser, UserPayload } from './types/user.types';
+import { IUser } from './types/user.types';
 import { UsersMapper } from './users.mapper';
 import { MailService } from '../mail/mail.service';
 import { UpdateUserDto, UserDto } from './dto/auth.dto';
 import { APP_CONSTANTS } from 'src/common/config/constants.config';
 import { StorageUpload } from '../storage/storage.upload';
 import { StorageService } from '../storage/storage.service';
+import { resolveLocation } from 'src/common/util/location.util';
 
 @Injectable()
 export class UsersService {
@@ -52,10 +53,7 @@ export class UsersService {
     return result;
   }
 
-  async createUser(
-    data: UserDto & { country: string },
-    avatar?: Express.Multer.File,
-  ) {
+  async createUser(data: UserDto, avatar?: Express.Multer.File) {
     const {
       first_name,
       last_name,
@@ -64,7 +62,8 @@ export class UsersService {
       phone_number,
       is_active,
       roles,
-      country,
+      location_type,
+      location_code,
     } = data;
 
     // 1. check email exists
@@ -95,7 +94,11 @@ export class UsersService {
 
       const password_hash = await bcrypt.hash(password, 12);
 
-      // 4. create user
+      // 4. resolve the full county/constituency/ward ancestry from
+      // whatever level the client submitted — all-null if none given
+      const location = resolveLocation(location_type, location_code);
+
+      // 5. create user
       const user = await this.usersRepo.createUserWithRoles({
         first_name,
         last_name,
@@ -103,9 +106,9 @@ export class UsersService {
         password_hash,
         phone_number,
         is_active,
-        country,
         avatar_url,
         role_ids: roles,
+        ...location,
       });
 
       const fullUser = await this.usersRepo.findById(user.id);
@@ -119,6 +122,8 @@ export class UsersService {
           id: fullUser.id,
           email: fullUser.email,
           avatar_url: fullUser.avatar_url,
+          location_type: fullUser.location_type,
+          location_name: fullUser.location_name,
           roles: fullUser.roles.map((r) => r.name),
         },
       };
@@ -160,6 +165,14 @@ export class UsersService {
       }
     }
 
+    // Only touch the location columns if the client actually sent a
+    // location_type/location_code — otherwise leave the existing ancestry
+    // untouched instead of nulling it out.
+    const location =
+      data.location_type || data.location_code
+        ? resolveLocation(data.location_type, data.location_code)
+        : undefined;
+
     let newAvatarUrl: string | null = null;
 
     try {
@@ -170,7 +183,7 @@ export class UsersService {
         data.avatar_url = newAvatarUrl;
       }
 
-      const updated = await this.usersRepo.updateUserWithRoles(userId, data);
+      const updated = await this.usersRepo.updateUserWithRoles(userId, data, location);
 
       // delete old avatar AFTER successful update
       if (newAvatarUrl && user.avatar_url) {
