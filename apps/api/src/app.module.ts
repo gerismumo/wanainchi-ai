@@ -8,9 +8,25 @@ import { JwtModule } from '@nestjs/jwt';
 import { jwtConstants } from './common/config/constants.config';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { AbuseLogsModule } from './modules/abuse-logs/abuse-logs.module';
+import { AiModule } from './modules/ai/ai.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { CommentsModule } from './modules/comments/comments.module';
+import { DevicesModule } from './modules/devices/devices.module';
+import { DigestsModule } from './modules/digests/digests.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { VotesModule } from './modules/votes/votes.module';
 
 @Module({
   imports: [
+    AbuseLogsModule,
+    AiModule,
+    AnalyticsModule,
+    CommentsModule,
+    DevicesModule,
+    DigestsModule,
+    ReportsModule,
+    VotesModule,
     UsersModule,
     AuthModule,
     MailModule,

@@ -46,6 +46,8 @@ export type EnvConfig = {
   SMTP_PASS: string;
   SMTP_SECURE: boolean;
 
+  GEMINI_API_KEY:string;
+
   CORS_ORIGINS: string;
   CORS_REGEX_ORIGINS: string;
   CORS_DEV_ORIGINS?: string;

@@ -93,6 +93,7 @@ export const ENV: EnvConfig = {
   SMTP_SECURE: (process.env.SMTP_SECURE ?? 'false').toLowerCase() === 'true',
   RESEND_API_KEY: required('RESEND_API_KEY'),
   RESEND_FROM_EMAIL: required('RESEND_FROM_EMAIL'),
+  GEMINI_API_KEY:required('GEMINI_API_KEY'),
   CORS_ORIGINS: required('CORS_ORIGINS'),
   CORS_REGEX_ORIGINS: required('CORS_REGEX_ORIGINS'),
   CORS_DEV_ORIGINS: process.env.CORS_DEV_ORIGINS,

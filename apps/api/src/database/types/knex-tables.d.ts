@@ -14,7 +14,7 @@ import { Knex } from 'knex';
 // - bigint count(*) -> string, since JS numbers can't safely hold it
 // -----------------------------------------------------------------
 
-type LocationType = 'county' | 'constituency' | 'ward' | 'locality' | 'area';
+export type LocationType = 'county' | 'constituency' | 'ward' | 'locality' | 'area';
 
 // Shared across users / reports / ai_digests — mirrors addLocationColumns()
 // in the migration. Every field is nullable since a row may have no
@@ -305,7 +305,7 @@ declare module 'knex/types/tables' {
       // client_uuid/fingerprint_hash: at least one is required by the
       // check constraint — TS can't express the "at least one of" rule,
       // so both stay optional here; enforce it in a service-layer guard.
-      Partial<Omit<Device, 'id' | 'first_seen_at' | 'last_seen_at' | 'trust_score' | 'submission_count'>>,
+      Partial<Omit<Device, 'id' | 'first_seen_at' | 'last_seen_at' | 'trust_score' >>,
       Partial<Omit<Device, 'id'>>
     >;
 

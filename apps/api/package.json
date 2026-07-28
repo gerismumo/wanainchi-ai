@@ -25,6 +25,7 @@
     "db:reset": "pnpm run migrate:rollback:all && pnpm run migrate:latest && pnpm run seed:run"
   },
   "dependencies": {
+    "@google/genai": "^2.13.0",
     "@nestjs/common": "^11.1.11",
     "@nestjs/core": "^11.1.11",
     "@nestjs/jwt": "^11.0.2",
