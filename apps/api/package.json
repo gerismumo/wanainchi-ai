@@ -30,7 +30,6 @@
     "@nestjs/core": "^11.1.11",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.1.11",
-    "@repo/api": "workspace:*",
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.3.0",
     "dotenv": "^17.4.2",
