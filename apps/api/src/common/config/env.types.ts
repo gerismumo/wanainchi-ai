@@ -23,7 +23,7 @@ export type EnvConfig = {
 
   ADMIN_FIRST_NAME?: string;
   ADMIN_LAST_NAME?: string;
-  ADMIN_EMAIL: string;
+  ADMIN_EMAIL?: string;
   ADMIN_PASSWORD?: string;
   ADMIN_PHONE?: string;
 
@@ -35,16 +35,11 @@ export type EnvConfig = {
   MINIO_PUBLIC_URL: string;
   MINIO_BUCKET: string;
   MINIO_BUCKET_DEV: string;
-  RESEND_API_KEY:string;
-  RESEND_FROM_EMAIL:string;
 
-  JWT_SECRET: string;
+  RESEND_API_KEY?:string;
+  RESEND_FROM_EMAIL?:string;
 
-  SMTP_HOST: string;
-  SMTP_PORT: number;
-  SMTP_USER: string;
-  SMTP_PASS: string;
-  SMTP_SECURE: boolean;
+  JWT_SECRET?: string;
 
   GEMINI_API_KEY:string;
 

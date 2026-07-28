@@ -12,6 +12,8 @@ concurrency:
 env:
   # Centralized so you only edit paths in one place.
   COMPOSE_ENV_FILES: >-
+    --env-file /home/apps/wananchiai/.env
+    --env-file /home/apps/wananchiai/api/.env
     --env-file /home/apps/wananchiai/web/.env
 
 jobs:

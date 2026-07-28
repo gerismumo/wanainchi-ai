@@ -72,7 +72,7 @@ export const ENV: EnvConfig = {
 
   ADMIN_FIRST_NAME: process.env.ADMIN_FIRST_NAME,
   ADMIN_LAST_NAME: process.env.ADMIN_LAST_NAME,
-  ADMIN_EMAIL: required('ADMIN_EMAIL'),
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL,
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
   ADMIN_PHONE: process.env.ADMIN_PHONE,
 
@@ -84,15 +84,11 @@ export const ENV: EnvConfig = {
   MINIO_PUBLIC_URL: required('MINIO_PUBLIC_URL'),
   MINIO_BUCKET: required('MINIO_BUCKET'),
   MINIO_BUCKET_DEV: required('MINIO_BUCKET_DEV'),
-  JWT_SECRET: required('JWT_SECRET'),
+  JWT_SECRET: process.env.JWT_SECRET,
   // EVIDENCE_SECRET_KEY: required('EVIDENCE_SECRET_KEY'),
-  SMTP_HOST: required('SMTP_HOST'),
-  SMTP_PORT: Number(required('SMTP_PORT')),
-  SMTP_USER: required('SMTP_USER'),
-  SMTP_PASS: required('SMTP_PASS'),
-  SMTP_SECURE: (process.env.SMTP_SECURE ?? 'false').toLowerCase() === 'true',
-  RESEND_API_KEY: required('RESEND_API_KEY'),
-  RESEND_FROM_EMAIL: required('RESEND_FROM_EMAIL'),
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+  
   GEMINI_API_KEY:required('GEMINI_API_KEY'),
   CORS_ORIGINS: required('CORS_ORIGINS'),
   CORS_REGEX_ORIGINS: required('CORS_REGEX_ORIGINS'),
