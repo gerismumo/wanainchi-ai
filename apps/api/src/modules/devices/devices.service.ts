@@ -48,6 +48,14 @@ export class DevicesService {
     return this.repo.countRecentSubmissions(deviceId, sinceMinutes);
   }
 
+  async findByClientUuid(clientUuid: string) {
+    return this.repo.findByClientUuid(clientUuid);
+  }
+
+  async findByFingerprint(fingerprintHash: string) {
+    return this.repo.findByFingerprint(fingerprintHash);
+  }
+
   async linkToUser(deviceId: string, userId: string): Promise<void> {
     await this.repo.linkToUser(deviceId, userId);
   }

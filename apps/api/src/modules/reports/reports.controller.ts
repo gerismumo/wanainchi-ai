@@ -28,6 +28,10 @@ import { UserRole } from 'src/common/enums/roles.enums';
 
 import { DeviceContext } from '../devices/devices.service';
 import { DeviceId } from 'src/common/decorators/device.decorator';
+import { RateLimit } from 'src/common/decorators/rate-limit.decorator';
+
+// 5 submissions per device per minute; IP cap stays at the default 60
+const SUBMIT_RATE_LIMIT = RateLimit({ deviceMax: 5, windowMs: 60_000 });
 
 const mediaInterceptor = FileInterceptor('file', {
   storage: memoryStorage(),
@@ -39,6 +43,7 @@ export class ReportsController {
   constructor(private readonly service: ReportsService) {}
 
   @Public()
+  @SUBMIT_RATE_LIMIT
   @Post('text')
   async createText(
     @Body() body: unknown,
@@ -59,6 +64,7 @@ export class ReportsController {
   }
 
   @Public()
+  @SUBMIT_RATE_LIMIT
   @Post('voice')
   @UseInterceptors(mediaInterceptor)
   async createVoice(
@@ -83,6 +89,7 @@ export class ReportsController {
   }
 
   @Public()
+  @SUBMIT_RATE_LIMIT
   @Post('photo')
   @UseInterceptors(mediaInterceptor)
   async createPhoto(

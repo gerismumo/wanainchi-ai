@@ -13,7 +13,9 @@ import { Request, Response } from 'express';
 import { Authservice } from './auth.service';
 import { Public, Roles } from 'src/common/decorators/roles.decorators';
 import { UserRole } from 'src/common/enums/roles.enums';
+import { SkipRateLimit } from 'src/common/decorators/rate-limit.decorator';
 
+@SkipRateLimit()
 @Controller('auth')
 export class AuthController {
   constructor(private service: Authservice) {}
