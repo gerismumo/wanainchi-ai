@@ -1,8 +1,13 @@
 import { z } from 'zod';
 
+const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema.optional());
+
 export const locationInputSchema = z.object({
-  location_type: z.enum(['county', 'constituency', 'ward', 'locality', 'area']).optional(),
-  location_code: z.string().optional(),
+   location_type: emptyToUndefined(
+    z.enum(["county", "constituency", "ward", "locality", "area"])
+  ),
+  location_code: emptyToUndefined(z.string()),
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
 });
@@ -28,14 +33,14 @@ export const updateReportStatusSchema = z.object({
 export const reportQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  status: z.enum(['received', 'processing', 'reviewed', 'in_progress', 'resolved']).optional(),
-  category: z.string().optional(),
-  sentiment: z.enum(['positive', 'neutral', 'negative', 'urgent']).optional(),
-  location_type: z.enum(['county', 'constituency', 'ward', 'locality', 'area']).optional(),
-  location_code: z.string().optional(),
-  county_code: z.string().optional(),
-  constituency_code: z.string().optional(),
-  q: z.string().optional(),
+  status: emptyToUndefined(z.enum(['received', 'processing', 'reviewed', 'in_progress', 'resolved']).optional()),
+  category: emptyToUndefined(z.string().optional()),
+  sentiment: emptyToUndefined(z.enum(['positive', 'neutral', 'negative', 'urgent']).optional()),
+  location_type: emptyToUndefined(z.enum(['county', 'constituency', 'ward', 'locality', 'area']).optional()),
+  location_code: emptyToUndefined(z.string().optional()),
+  county_code: emptyToUndefined(z.string().optional()),
+  constituency_code: emptyToUndefined(z.string().optional()),
+  q: emptyToUndefined(z.string().optional()),
 });
 
 export const myReportsQuerySchema = z.object({

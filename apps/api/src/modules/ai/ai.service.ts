@@ -55,12 +55,17 @@ no markdown fences, no commentary, matching this exact shape:
   "urgencyScore": number between 0 and 1,
   "confidenceScore": number between 0 and 1,
   "isSpam": boolean,
-  "spamScore": number between 0 and 1
+  "spamScore": number between 0 and 1,
+  "mentionedLocation": { "name": string, "levelGuess": "county" | "constituency" | "ward" | "locality" | "area" | null } | null
 }
 Rules:
 - "translatedText" is null if the report is already in English, otherwise it is the English translation.
 - Mark "isSpam" true only for gibberish, advertising, or content with no genuine civic complaint or request.
 - "urgencyScore" should reflect real risk to life, health, or safety, not just emotional tone.
+- "mentionedLocation": if the report names a specific place — a county, constituency, ward, estate,
+  market, road, or well-known landmark — extract it as written (e.g. "Kangemi", "Waiyaki Way") and give
+  your best guess at its administrative level. Set "levelGuess" to null if you can't tell the level.
+  Set "mentionedLocation" to null entirely if no place is named. Never invent a place that isn't there.
 
 Report:
 """${content}"""`;
@@ -75,20 +80,30 @@ Report:
       confidenceScore: 0,
       isSpam: false,
       spamScore: 0,
+      mentionedLocation: null,
     });
   }
 
   async transcribeVoice(buffer: Buffer, mimetype: string): Promise<AiTranscriptionResult> {
     const prompt = `Transcribe this citizen voice report verbatim. It may be spoken in English, Kiswahili, or Sheng —
 transcribe in whichever language(s) it was actually spoken, do not translate.
-Respond with ONLY JSON, no markdown fences: { "transcript": string, "detectedLanguage": "en" | "sw" | "sheng" | "other" }`;
+Also listen for any specific place named in the recording — a county, constituency, ward, estate, market,
+road, or well-known landmark — and extract it, since many callers will name their location out loud
+instead of using a map picker.
+Respond with ONLY JSON, no markdown fences:
+{
+  "transcript": string,
+  "detectedLanguage": "en" | "sw" | "sheng" | "other",
+  "mentionedLocation": { "name": string, "levelGuess": "county" | "constituency" | "ward" | "locality" | "area" | null } | null
+}
+Set "mentionedLocation" to null if no place is named in the recording — never guess.`;
 
     return this.generateJson<AiTranscriptionResult>(
       [
         { text: prompt },
         { inlineData: { mimeType: mimetype, data: buffer.toString('base64') } },
       ],
-      { transcript: '', detectedLanguage: 'other' },
+      { transcript: '', detectedLanguage: 'other', mentionedLocation: null },
     );
   }
 
@@ -96,15 +111,36 @@ Respond with ONLY JSON, no markdown fences: { "transcript": string, "detectedLan
     const prompt = `Look at this photo submitted as a civic report${caption ? ` with caption: "${caption}"` : ''}.
 Describe the visible community issue (e.g. pothole, burst water pipe, uncollected garbage, damaged school block)
 in one factual sentence, classify it, and say whether an actual issue is visibly present in the photo.
+Also check the caption and any visible signage, shopfronts, or landmarks in the photo itself for a place name.
+Finally, judge whether this is a genuine civic report at all, versus spam — a meme, an advertisement, a
+screenshot, a selfie or unrelated personal photo, or anything with no visible connection to a real
+community issue.
 Respond with ONLY JSON, no markdown fences:
-{ "description": string, "category": one of ${JSON.stringify(REPORT_CATEGORIES)}, "hasVisibleIssue": boolean }`;
+{
+  "description": string,
+  "category": one of ${JSON.stringify(REPORT_CATEGORIES)},
+  "hasVisibleIssue": boolean,
+  "isSpam": boolean,
+  "spamScore": number between 0 and 1,
+  "mentionedLocation": { "name": string, "levelGuess": "county" | "constituency" | "ward" | "locality" | "area" | null } | null
+}
+Set "mentionedLocation" to null if no place name is legible in the caption or the photo — never guess.
+Mark "isSpam" true only when the photo clearly isn't a civic report — an unrelated issue that's plausibly
+a real community problem should NOT be marked spam even if you're unsure of the exact category.`;
 
     return this.generateJson<AiImageAnalysis>(
       [
         { text: prompt },
         { inlineData: { mimeType: mimetype, data: buffer.toString('base64') } },
       ],
-      { description: caption ?? 'Photo report submitted by a citizen.', category: 'other', hasVisibleIssue: true },
+      {
+        description: caption ?? 'Photo report submitted by a citizen.',
+        category: 'other',
+        hasVisibleIssue: true,
+        isSpam: false,
+        spamScore: 0,
+        mentionedLocation: null,
+      },
     );
   }
 

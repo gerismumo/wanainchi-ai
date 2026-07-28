@@ -1,4 +1,4 @@
-import { kenyaLocations } from 'ke-locations-data';
+import { kenyaLocations, SearchResult } from 'ke-locations-data';
 
 export type LocationType = 'county' | 'constituency' | 'ward' | 'locality' | 'area';
 
@@ -121,5 +121,43 @@ export function resolveLocation(type?: LocationType, code?: string): ResolvedLoc
 
     default:
       return { ...EMPTY };
+  }
+}
+
+/**
+ * Fallback path for reports where the citizen never picked a location on a
+ * map/dropdown — Gemma pulls a place name straight out of the free text
+ * ("Kangemi", "Waiyaki Way, Westlands") and we look it up here by name
+ * instead of by code.
+ *
+ * NB: assumes `kenyaLocations.search(query)` exists per the package's own
+ * `SearchResult`/`SearchType` types — verify against the installed
+ * ke-locations-data version if search() isn't actually exposed that way.
+ *
+ * `levelHint` is Gemma's best guess at the administrative level (county /
+ * constituency / ward / locality / area) — used only to prefer the right
+ * match when the search returns several places that share a name (e.g. a
+ * "Kangemi" ward vs. a "Kangemi" market). If nothing matches the hint, or
+ * no hint was given, we fall back to the package's own top-ranked result.
+ */
+export function resolveLocationByName(
+  name: string,
+  levelHint?: LocationType | null,
+): ResolvedLocation {
+  const query = name?.trim();
+  if (!query) return { ...EMPTY };
+
+  try {
+    const results: SearchResult[] = kenyaLocations.search(query) ?? [];
+    if (!results.length) return { ...EMPTY };
+
+    const match = (levelHint && results.find((r) => r.type === levelHint)) || results[0]!;
+    const code = (match.item as { code: string }).code;
+
+    return resolveLocation(match.type as LocationType, code);
+  } catch {
+    // Package threw (unknown query shape, version mismatch, etc.) — treat
+    // it the same as "no match found" rather than failing the report.
+    return { ...EMPTY };
   }
 }

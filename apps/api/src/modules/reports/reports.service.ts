@@ -6,10 +6,11 @@ import { AiService } from '../ai/ai.service';
 import { DevicesService, DeviceContext } from '../devices/devices.service';
 import { StorageUpload } from '../storage/storage.upload';
 import { AbuseLogsRepository } from '../abuse-logs/abuse-logs.repository';
-import { resolveLocation } from 'src/common/util/location.util';
-import { CreateMediaReportDto, CreateTextReportDto, ReportQueryDto } from './dto/report.dto';
+import { resolveLocation, resolveLocationByName, ResolvedLocation } from 'src/common/util/location.util';
+import { CreateMediaReportDto, CreateTextReportDto, LocationInputDto, ReportQueryDto } from './dto/report.dto';
 import { PaginatedResult } from 'src/common/util/pagination.util';
 import { ReportPublic } from './types/report.types';
+import { MentionedLocation } from '../ai/ai.types';
 
 // Hourly submission caps per device — low-trust devices (repeat spam/rate-limit
 // hits) get squeezed harder than a clean, established device.
@@ -42,7 +43,7 @@ export class ReportsService {
     await this.guardRateLimit(device.id, device.trust_score, ip);
 
     const analysis = await this.ai.analyzeText(dto.content_text);
-    const location = resolveLocation(dto.location_type, dto.location_code);
+    const location = this.resolveReportLocation(dto, analysis.mentionedLocation);
 
     const report = await this.repo.create({
       type: 'text',
@@ -94,6 +95,7 @@ export class ReportsService {
     let isSpam = false;
     let spamScore = 0;
     let language = 'en';
+    let mentionedLocation: MentionedLocation | null = null;
 
     if (type === 'voice') {
       const transcription = await this.ai.transcribeVoice(file.buffer, file.mimetype);
@@ -110,6 +112,10 @@ export class ReportsService {
       confidence = analysis.confidenceScore;
       isSpam = analysis.isSpam;
       spamScore = analysis.spamScore;
+      // Prefer the text-analysis extraction, but fall back to whatever the
+      // transcription pass itself heard directly in the audio — useful if
+      // analyzeText() hit an error and returned its no-op fallback.
+      mentionedLocation = analysis.mentionedLocation ?? transcription.mentionedLocation;
     } else {
       const imageAnalysis = await this.ai.analyzeImage(file.buffer, file.mimetype, dto.caption);
       contentText = dto.caption ?? imageAnalysis.description;
@@ -117,9 +123,12 @@ export class ReportsService {
       summary = imageAnalysis.description;
       confidence = imageAnalysis.hasVisibleIssue ? 0.7 : 0.3;
       urgency = imageAnalysis.hasVisibleIssue ? 0.4 : 0.15;
+      isSpam = imageAnalysis.isSpam;
+      spamScore = imageAnalysis.spamScore;
+      mentionedLocation = imageAnalysis.mentionedLocation;
     }
 
-    const location = resolveLocation(dto.location_type, dto.location_code);
+    const location = this.resolveReportLocation(dto, mentionedLocation);
 
     const report = await this.repo.create({
       type,
@@ -203,6 +212,29 @@ export class ReportsService {
     }
   }
 
+  /**
+   * Location fields on every report DTO are optional by design — most
+   * citizens will never touch a map picker, especially on voice/SMS. If the
+   * client did supply an explicit location_type/location_code (e.g. from a
+   * GPS-confirmed picker), that always wins since it's more reliable than
+   * an NLP guess. Otherwise, fall back to whatever place Gemma pulled out
+   * of the report text/photo and resolve it by name instead of by code.
+   */
+  private resolveReportLocation(
+    dto: LocationInputDto,
+    mentioned: MentionedLocation | null,
+  ): ResolvedLocation {
+    if (dto.location_type && dto.location_code) {
+      return resolveLocation(dto.location_type, dto.location_code);
+    }
+
+    if (mentioned?.name) {
+      return resolveLocationByName(mentioned.name, mentioned.levelGuess);
+    }
+
+    return resolveLocation(undefined, undefined);
+  }
+
   private async guardRateLimit(deviceId: string, trustScore: string, ip: string | null): Promise<void> {
     const recentCount = await this.devices.countRecentSubmissions(deviceId, 60);
     const trust = parseFloat(trustScore ?? '0.5');
@@ -244,7 +276,7 @@ export class ReportsService {
    * needing a live vector-DB round trip on every single submission. Real
    * semantic dedupe still happens downstream via embedding_id + Qdrant.
    */
-  private textSimilarity(a: string, b: string): number {
+   private textSimilarity(a: string, b: string): number {
     const setA = new Set(a.split(/\s+/).filter(Boolean));
     const setB = new Set(b.split(/\s+/).filter(Boolean));
     if (!setA.size || !setB.size) return 0;
@@ -253,6 +285,9 @@ export class ReportsService {
     for (const word of setA) if (setB.has(word)) intersection += 1;
 
     const union = setA.size + setB.size - intersection;
-    return union === 0 ? 0 : intersection / union;
+
+    const result =  union === 0 ? 0 : intersection / union;
+
+    return result;
   }
 }
