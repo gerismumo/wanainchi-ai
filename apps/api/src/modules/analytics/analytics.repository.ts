@@ -19,7 +19,9 @@ export class AnalyticsRepository {
   }
 
   async getTopCategories(limit = 10) {
-    return this.knex('v_top_categories').limit(limit);
+    return this.knex('v_top_categories')
+      .orderBy('report_count', 'desc')
+      .limit(limit);
   }
 
   async getReturningDevices(limit = 50) {

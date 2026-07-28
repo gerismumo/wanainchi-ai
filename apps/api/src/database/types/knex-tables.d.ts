@@ -229,6 +229,9 @@ declare module 'knex/types/tables' {
     county_code: string | null;
     county_name: string | null;
     constituency_code: string | null;
+    constituency_name: string | null;
+    locality_code: string | null;
+    locality_name: string | null;
     total_reports: string; // count(*) comes back as string (bigint)
     resolved_count: string;
     avg_urgency: string | null;

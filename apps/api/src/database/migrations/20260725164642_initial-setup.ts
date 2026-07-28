@@ -261,20 +261,7 @@ export async function up(knex: Knex): Promise<void> {
     `create unique index uq_votes_device on votes (report_id, device_id) where device_id is not null`
   );
 
-  // ---------------------------------------------------------
-  // comments
-  // ---------------------------------------------------------
-  await knex.schema.createTable("comments", (t) => {
-    t.uuid("id").primary().defaultTo(knex.raw("gen_random_uuid()"));
-    t.uuid("report_id").notNullable().references("id").inTable("reports").onDelete("CASCADE");
-    // Verified users only for comments — keeps abuse surface smaller
-    // for a one-day build than allowing anonymous comments too.
-    t.uuid("user_id").notNullable().references("id").inTable("users");
-    t.text("content").notNullable();
-    t.timestamp("created_at", { useTz: true }).notNullable().defaultTo(knex.fn.now());
 
-    t.index("report_id");
-  });
 
   // ---------------------------------------------------------
   // abuse_logs
@@ -314,17 +301,20 @@ export async function up(knex: Knex): Promise<void> {
   // county_code/constituency_code columns, no join required.
   // ---------------------------------------------------------
   await knex.raw(`
-    create view v_location_summary as
+    create or replace view v_location_summary as
     select
       location_type,
       location_code,
-      max(location_name) as location_name,
-      max(county_code) as county_code,
-      max(county_name) as county_name,
-      max(constituency_code) as constituency_code,
-      count(*) filter (where is_spam = false) as total_reports,
-      count(*) filter (where status = 'resolved') as resolved_count,
-      avg(urgency_score) filter (where is_spam = false) as avg_urgency
+      max(location_name)         as location_name,
+      max(county_code)           as county_code,
+      max(county_name)           as county_name,
+      max(constituency_code)     as constituency_code,
+      max(constituency_name)     as constituency_name,
+      max(locality_code)         as locality_code,
+      max(locality_name)         as locality_name,
+      count(*) filter (where is_spam = false)                          as total_reports,
+      count(*) filter (where is_spam = false and status = 'resolved')  as resolved_count,
+      avg(urgency_score)  filter (where is_spam = false)               as avg_urgency
     from reports
     where location_code is not null
     group by location_type, location_code
@@ -344,15 +334,15 @@ export async function up(knex: Knex): Promise<void> {
   `);
 
   await knex.raw(`
-    create view v_top_categories as
+    create or replace view v_top_categories as
     select
       category,
-      count(*) as report_count,
+      count(*)           as report_count,
       avg(urgency_score) as avg_urgency
     from reports
-    where is_spam = false and category is not null
+    where is_spam = false
+      and category is not null
     group by category
-    order by report_count desc
   `);
 
   // ---------------------------------------------------------
@@ -407,7 +397,6 @@ export async function down(knex: Knex): Promise<void> {
 
   await knex.schema.dropTableIfExists("ai_digests");
   await knex.schema.dropTableIfExists("abuse_logs");
-  await knex.schema.dropTableIfExists("comments");
   await knex.schema.dropTableIfExists("votes");
   await knex.schema.dropTableIfExists("reports");
 
