@@ -226,7 +226,7 @@ export class ReportsService {
       countyCode: query.county_code,
       constituencyCode: query.constituency_code,
       q: query.q,
-      includeSpam: false,
+      includeSpam: query.include_spam ?? false,
     });
 
     return { items: this.mapper.toPublicList(result.items), meta: result.meta };

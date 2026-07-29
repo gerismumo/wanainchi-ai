@@ -73,6 +73,7 @@ export interface ReportQueryParams {
   county_code?: string;
   constituency_code?: string;
   q?: string;
+  include_spam?: boolean;
 }
 
 export interface MyReportsQueryParams {

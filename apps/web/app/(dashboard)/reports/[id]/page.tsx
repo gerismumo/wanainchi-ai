@@ -6,7 +6,8 @@ import {
   ArrowLeft, MapPin, Mic, FileText, ImageIcon,
   ThumbsUp, AlertTriangle, RefreshCw, Loader2,
   Calendar, Clock, Globe, Hash, Copy, CheckCheck,
-  TrendingUp, MessageSquare, ShieldAlert,
+  TrendingUp, ShieldAlert,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -271,6 +272,19 @@ export default function ReportDetailPage({
         Back to reports
       </Link>
 
+      {/* Spam banner */}
+      {report.is_spam && (
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <div>
+            <p className="text-xs font-semibold text-destructive">Flagged as spam</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              This report was automatically classified as spam by the AI{report.spam_score != null ? ` (score: ${Math.round(report.spam_score * 100)}%)` : ""}. It is not shown in public feeds.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ---- Hero card ---- */}
       <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
         {/* Header row */}
@@ -321,34 +335,42 @@ export default function ReportDetailPage({
 
         {/* Photo */}
         {report.type === "photo" && report.media_url && (
-          <div className="mt-4 overflow-hidden rounded-lg border border-border">
+          <div className="mt-4 overflow-hidden rounded-xl border border-border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={report.media_url}
               alt="Report photo"
-              className="max-h-96 w-full object-contain bg-muted"
+              className="max-h-[480px] w-full cursor-zoom-in object-contain bg-muted"
+              onClick={() => window.open(report.media_url!, "_blank")}
             />
+            <div className="flex items-center justify-between border-t border-border bg-muted/30 px-3 py-2">
+              <span className="text-[11px] text-muted-foreground">Tap image to open full size</span>
+              <a href={report.media_url} target="_blank" rel="noopener noreferrer"
+                className="text-[11px] text-primary hover:underline">Open ↗</a>
+            </div>
           </div>
         )}
 
-        {/* Voice note */}
+        {/* Voice note — inline audio player */}
         {report.type === "voice" && report.media_url && (
-          <div className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-              <Mic className="size-4 text-primary" />
+          <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                <Mic className="size-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-card-foreground">Voice note</p>
+                <p className="text-[11px] text-muted-foreground">Submitted audio recording</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-card-foreground">Voice note attached</p>
-              <p className="truncate text-[11px] text-muted-foreground">{report.media_url}</p>
-            </div>
-            <a
-              href={report.media_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0 text-xs")}
-            >
-              Play
-            </a>
+            {/* Native audio element — works on all mobile browsers */}
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <audio
+              controls
+              preload="metadata"
+              className="w-full rounded-lg"
+              src={report.media_url}
+            />
           </div>
         )}
 
@@ -370,10 +392,7 @@ export default function ReportDetailPage({
             onVoted={() => mutate()}
           />
 
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <MessageSquare className="size-3.5" />
-            <span>{report.comment_count} {report.comment_count === 1 ? "comment" : "comments"}</span>
-          </div>
+    
 
           {/* Copy ID */}
           <button
@@ -388,7 +407,7 @@ export default function ReportDetailPage({
       </div>
 
       {/* ---- Stat tiles ---- */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile
           icon={TrendingUp}
           label="Urgency"
@@ -414,12 +433,6 @@ export default function ReportDetailPage({
           value={report.vote_count.toLocaleString()}
           sub="community support"
           color="text-emerald-500"
-        />
-        <StatTile
-          icon={MessageSquare}
-          label="Comments"
-          value={report.comment_count.toLocaleString()}
-          sub="community responses"
         />
       </div>
 

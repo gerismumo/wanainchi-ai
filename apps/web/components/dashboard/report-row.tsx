@@ -16,6 +16,7 @@ export interface ReportRowData {
   sentiment: ReportSentiment;
   urgencyScore: number;
   createdAt: string; // ISO string
+  isSpam?: boolean;
 }
 
 const TYPE_ICONS: Record<ReportType, React.ElementType> = {
@@ -91,6 +92,11 @@ export function ReportRow({ report, className }: ReportRowProps) {
           >
             {STATUS_LABELS[report.status]}
           </span>
+          {report.isSpam && (
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-destructive/10 text-destructive">
+              Spam
+            </span>
+          )}
         </div>
         <p className="truncate text-xs text-muted-foreground">{report.summary}</p>
       </div>

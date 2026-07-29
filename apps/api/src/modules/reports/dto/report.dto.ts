@@ -41,6 +41,10 @@ export const reportQuerySchema = z.object({
   county_code: emptyToUndefined(z.string().optional()),
   constituency_code: emptyToUndefined(z.string().optional()),
   q: emptyToUndefined(z.string().optional()),
+  include_spam: z.preprocess(
+    (v) => v === 'true' || v === true,
+    z.boolean().optional().default(false),
+  ),
 });
 
 export const myReportsQuerySchema = z.object({
