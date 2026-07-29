@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes waveBar {
+  0%   { height: 4px; }
+  100% { height: 20px; }
+}
+
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);

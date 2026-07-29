@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Report } from 'knex/types/tables';
 import { ReportsRepository } from './reports.repository';
 import { ReportsMapper } from './reports.mapper';
@@ -10,7 +10,7 @@ import { resolveLocation, resolveLocationByName, ResolvedLocation } from 'src/co
 import { CreateMediaReportDto, CreateTextReportDto, LocationInputDto, ReportQueryDto } from './dto/report.dto';
 import { PaginatedResult } from 'src/common/util/pagination.util';
 import { ReportPublic } from './types/report.types';
-import { MentionedLocation } from '../ai/ai.types';
+import { AiImageAnalysis, AiTextAnalysis, MentionedLocation } from '../ai/ai.types';
 
 // Hourly submission caps per device — low-trust devices (repeat spam/rate-limit
 // hits) get squeezed harder than a clean, established device.
@@ -24,6 +24,8 @@ const DUPLICATE_SIMILARITY_THRESHOLD = 0.6;
 
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger(ReportsService.name);
+
   constructor(
     private readonly repo: ReportsRepository,
     private readonly mapper: ReportsMapper,
@@ -42,7 +44,27 @@ export class ReportsService {
     const device = await this.devices.resolveDevice(deviceCtx, ip, null);
     await this.guardRateLimit(device.id, device.trust_score, ip);
 
-    const analysis = await this.ai.analyzeText(dto.content_text);
+    // AI enrichment failure degrades gracefully — the report is still saved
+    // with sensible defaults, but the error details are logged and returned.
+    let analysis: AiTextAnalysis;
+    try {
+      analysis = await this.ai.analyzeText(dto.content_text);
+    } catch (err) {
+      this.logger.warn(`Text AI enrichment skipped: ${(err as Error).message}`);
+      analysis = {
+        translatedText: null,
+        detectedLanguage: 'other',
+        category: 'other',
+        summary: dto.content_text.slice(0, 200),
+        sentiment: 'neutral',
+        urgencyScore: 0.3,
+        confidenceScore: 0,
+        isSpam: false,
+        spamScore: 0,
+        mentionedLocation: null,
+      };
+    }
+
     const location = this.resolveReportLocation(dto, analysis.mentionedLocation);
 
     const report = await this.repo.create({
@@ -98,13 +120,33 @@ export class ReportsService {
     let mentionedLocation: MentionedLocation | null = null;
 
     if (type === 'voice') {
+      // transcribeVoice uses gemini-2.0-flash — audio errors must surface
+      // to the user since without a transcript there's nothing to classify.
       const transcription = await this.ai.transcribeVoice(file.buffer, file.mimetype);
       contentText = transcription.transcript || contentText;
       language = transcription.detectedLanguage !== 'other' ? transcription.detectedLanguage : 'en';
 
-      const analysis = await this.ai.analyzeText(
-        contentText || dto.caption || 'Voice report with no clear transcript available.',
-      );
+      // Text analysis on the transcript is best-effort — fall back gracefully.
+      let analysis: AiTextAnalysis;
+      try {
+        analysis = await this.ai.analyzeText(
+          contentText || dto.caption || 'Voice report with no clear transcript available.',
+        );
+      } catch (err) {
+        this.logger.warn(`Voice text AI enrichment skipped: ${(err as Error).message}`);
+        analysis = {
+          translatedText: null,
+          detectedLanguage: 'other',
+          category: 'other',
+          summary: contentText.slice(0, 200),
+          sentiment: 'neutral',
+          urgencyScore: 0.3,
+          confidenceScore: 0,
+          isSpam: false,
+          spamScore: 0,
+          mentionedLocation: null,
+        };
+      }
       category = analysis.category;
       summary = analysis.summary;
       sentiment = analysis.sentiment;
@@ -112,12 +154,23 @@ export class ReportsService {
       confidence = analysis.confidenceScore;
       isSpam = analysis.isSpam;
       spamScore = analysis.spamScore;
-      // Prefer the text-analysis extraction, but fall back to whatever the
-      // transcription pass itself heard directly in the audio — useful if
-      // analyzeText() hit an error and returned its no-op fallback.
       mentionedLocation = analysis.mentionedLocation ?? transcription.mentionedLocation;
     } else {
-      const imageAnalysis = await this.ai.analyzeImage(file.buffer, file.mimetype, dto.caption);
+      // Image analysis is best-effort — fall back gracefully on error.
+      let imageAnalysis: AiImageAnalysis;
+      try {
+        imageAnalysis = await this.ai.analyzeImage(file.buffer, file.mimetype, dto.caption);
+      } catch (err) {
+        this.logger.warn(`Image AI enrichment skipped: ${(err as Error).message}`);
+        imageAnalysis = {
+          description: dto.caption ?? 'Photo report submitted by a citizen.',
+          category: 'other',
+          hasVisibleIssue: true,
+          isSpam: false,
+          spamScore: 0,
+          mentionedLocation: null,
+        };
+      }
       contentText = dto.caption ?? imageAnalysis.description;
       category = imageAnalysis.category;
       summary = imageAnalysis.description;

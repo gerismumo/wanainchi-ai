@@ -9,10 +9,11 @@ import {
   REPORT_CATEGORIES,
 } from './ai.types';
 
-// gemma-4-31b-it is WananchiAI's classification/transcription workhorse —
-// cheap enough to run on every single submission, multimodal enough to
-// take text, voice notes, and photos through the same client.
-const MODEL = 'gemma-4-31b-it';
+// gemma-4-31b-it handles text and image classification — cheap enough to
+// run on every submission. gemini-2.0-flash-001 is used only for voice
+// transcription because Gemma does not support audio input modality.
+const MODEL       = 'gemma-4-31b-it';
+const AUDIO_MODEL = 'gemini-2.0-flash-001';
 
 @Injectable()
 export class AiService {
@@ -20,25 +21,31 @@ export class AiService {
   private readonly client = new GoogleGenAI({ apiKey: ENV.GEMINI_API_KEY });
 
   /**
-   * Shared helper: sends a multi-part prompt to Gemma, asks for raw JSON
-   * back, and parses it. On any failure (network, malformed JSON, model
-   * refusal) it logs and returns the caller-supplied fallback instead of
-   * throwing — a citizen's report should never be lost because the AI
-   * enrichment step hiccuped.
+   * Shared helper: sends a multi-part prompt, asks for raw JSON back, and
+   * parses it. On any failure (network, malformed JSON, model refusal) it
+   * logs the full error and re-throws so that the caller — and ultimately
+   * the HTTP response — can surface a meaningful message instead of
+   * silently returning a fallback that hides the real problem.
    */
-  private async generateJson<T>(parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>, fallback: T): Promise<T> {
+  private async generateJson<T>(
+    parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>,
+    model = MODEL,
+  ): Promise<T> {
+    let text = '{}';
     try {
       const response = await this.client.models.generateContent({
-        model: MODEL,
+        model,
         contents: [{ role: 'user', parts }],
         config: { responseMimeType: 'application/json' },
       });
-
-      const text = response.text ?? '{}';
+      text = response.text ?? '{}';
       return JSON.parse(text) as T;
     } catch (error) {
-      this.logger.error(`Gemma call failed: ${(error as Error).message}`);
-      return fallback;
+      const msg = (error as Error).message;
+      this.logger.error(`AI call failed (model=${model}): ${msg}`);
+      // Re-throw so controllers / services can decide whether to propagate
+      // the error to the HTTP client or apply their own graceful fallback.
+      throw new Error(`AI processing failed: ${msg}`);
     }
   }
 
@@ -70,18 +77,8 @@ Rules:
 Report:
 """${content}"""`;
 
-    return this.generateJson<AiTextAnalysis>([{ text: prompt }], {
-      translatedText: null,
-      detectedLanguage: 'other',
-      category: 'other',
-      summary: content.slice(0, 200),
-      sentiment: 'neutral',
-      urgencyScore: 0.3,
-      confidenceScore: 0,
-      isSpam: false,
-      spamScore: 0,
-      mentionedLocation: null,
-    });
+    // Re-throw — callers that can tolerate a degraded result must catch themselves.
+    return this.generateJson<AiTextAnalysis>([{ text: prompt }]);
   }
 
   async transcribeVoice(buffer: Buffer, mimetype: string): Promise<AiTranscriptionResult> {
@@ -98,12 +95,13 @@ Respond with ONLY JSON, no markdown fences:
 }
 Set "mentionedLocation" to null if no place is named in the recording — never guess.`;
 
+    // Audio requires gemini-2.0-flash — Gemma models do not support audio input.
     return this.generateJson<AiTranscriptionResult>(
       [
         { text: prompt },
         { inlineData: { mimeType: mimetype, data: buffer.toString('base64') } },
       ],
-      { transcript: '', detectedLanguage: 'other', mentionedLocation: null },
+      AUDIO_MODEL,
     );
   }
 
@@ -128,20 +126,10 @@ Set "mentionedLocation" to null if no place name is legible in the caption or th
 Mark "isSpam" true only when the photo clearly isn't a civic report — an unrelated issue that's plausibly
 a real community problem should NOT be marked spam even if you're unsure of the exact category.`;
 
-    return this.generateJson<AiImageAnalysis>(
-      [
-        { text: prompt },
-        { inlineData: { mimeType: mimetype, data: buffer.toString('base64') } },
-      ],
-      {
-        description: caption ?? 'Photo report submitted by a citizen.',
-        category: 'other',
-        hasVisibleIssue: true,
-        isSpam: false,
-        spamScore: 0,
-        mentionedLocation: null,
-      },
-    );
+    return this.generateJson<AiImageAnalysis>([
+      { text: prompt },
+      { inlineData: { mimeType: mimetype, data: buffer.toString('base64') } },
+    ]);
   }
 
   async summarizeForDigest(
@@ -158,9 +146,6 @@ of the emerging community priorities for this period, and rank the top issues by
 Respond with ONLY JSON, no markdown fences:
 { "summaryText": string, "topIssues": [{ "category": string, "count": number, "avgUrgency": number }] }`;
 
-    return this.generateJson<AiDigestSummary>([{ text: prompt }], {
-      summaryText: 'Not enough data was submitted in this period to generate a reliable summary.',
-      topIssues: [],
-    });
+    return this.generateJson<AiDigestSummary>([{ text: prompt }]);
   }
 }

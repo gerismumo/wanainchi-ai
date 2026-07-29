@@ -1,14 +1,17 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import {
-  Mic, FileText, ImageIcon, MapPin, Send, Info,
-  Camera, X, Loader2, CheckCircle2, RotateCcw, Upload,
+  Mic, FileText, ImageIcon, Send, Info,
+  Camera, X, Loader2, CheckCircle2, RotateCcw, Upload, Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useCreateTextReport, useCreateVoiceReport, useCreatePhotoReport } from "@/hooks/useReports";
+import { LocationPicker } from "@/components/location-picker";
+import type { ResolvedLocation } from "@/components/location-picker";
+import { VoiceRecorder } from "@/components/voice-recorder";
 import type { ReportLanguage } from "@/types/reports.types";
 
 // ---------------------------------------------------------------------------
@@ -16,9 +19,9 @@ import type { ReportLanguage } from "@/types/reports.types";
 // ---------------------------------------------------------------------------
 type SubmitType = "text" | "voice" | "photo";
 
-const CATEGORIES = [
+const PRESET_CATEGORIES = [
   "water", "roads", "health", "security",
-  "education", "electricity", "sanitation", "other",
+  "education", "electricity", "sanitation",
 ];
 
 const LANGUAGES: { value: ReportLanguage; label: string }[] = [
@@ -33,44 +36,30 @@ const TYPE_OPTIONS: {
   label: string;
   desc: string;
 }[] = [
-  { value: "text", icon: FileText, label: "Text", desc: "Type in English or Kiswahili" },
-  { value: "voice", icon: Mic, label: "Voice note", desc: "Upload audio from any app" },
-  { value: "photo", icon: ImageIcon, label: "Photo", desc: "Attach or take a photo" },
+  { value: "text",  icon: FileText,   label: "Text",       desc: "Type in any language" },
+  { value: "voice", icon: Mic,        label: "Voice",      desc: "Record or upload audio" },
+  { value: "photo", icon: ImageIcon,  label: "Photo",      desc: "Camera or gallery" },
 ];
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Photo preview
 // ---------------------------------------------------------------------------
-function FilePreview({
-  file, onRemove,
-}: { file: File; onRemove: () => void }) {
-  const isImage = file.type.startsWith("image/");
-  const url = isImage ? URL.createObjectURL(file) : null;
-
+function PhotoPreview({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const url = URL.createObjectURL(file);
   return (
-    <div className="relative flex items-center gap-3 rounded-lg border border-border bg-muted/50 p-3">
-      {isImage && url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="preview" className="size-14 shrink-0 rounded-md object-cover" />
-      ) : (
-        <div className="flex size-14 shrink-0 items-center justify-center rounded-md bg-muted">
-          <Mic className="size-5 text-muted-foreground" />
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium text-card-foreground">{file.name}</p>
-        <p className="text-[11px] text-muted-foreground">
-          {(file.size / 1024 / 1024).toFixed(1)} MB
-        </p>
-      </div>
+    <div className="group relative overflow-hidden rounded-2xl border border-border">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="preview" className="max-h-64 w-full object-cover" />
       <button
         type="button"
         onClick={onRemove}
-        className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-destructive/10"
-        aria-label="Remove file"
+        className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-background/80 backdrop-blur transition-colors hover:bg-destructive/10"
       >
-        <X className="size-3 text-muted-foreground" />
+        <X className="size-3.5 text-foreground" />
       </button>
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2">
+        <p className="truncate text-[11px] text-white/80">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</p>
+      </div>
     </div>
   );
 }
@@ -101,78 +90,162 @@ function SuccessScreen({ onReset }: { onReset: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
+// Category picker with custom entry
+// ---------------------------------------------------------------------------
+function CategoryPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [customMode, setCustomMode] = useState(false);
+  const [customInput, setCustomInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const isCustom = value && !PRESET_CATEGORIES.includes(value);
+
+  useEffect(() => {
+    if (customMode) inputRef.current?.focus();
+  }, [customMode]);
+
+  const commitCustom = () => {
+    const trimmed = customInput.trim().toLowerCase();
+    if (trimmed) { onChange(trimmed); setCustomMode(false); }
+    else setCustomMode(false);
+  };
+
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        Category <span className="normal-case font-normal tracking-normal">(optional)</span>
+      </p>
+
+      <div className="flex flex-wrap gap-2">
+        {PRESET_CATEGORIES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => { onChange(value === c ? "" : c); setCustomMode(false); }}
+            className={cn(
+              "rounded-xl border px-3 py-1.5 text-xs font-medium capitalize transition-colors",
+              value === c
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-card-foreground hover:border-primary/40 hover:bg-muted",
+            )}
+          >
+            {c}
+          </button>
+        ))}
+
+        {/* Show custom chip if a non-preset is active */}
+        {isCustom && !customMode && (
+          <button
+            type="button"
+            onClick={() => { setCustomInput(value); setCustomMode(true); }}
+            className="flex items-center gap-1 rounded-xl border border-primary bg-primary/5 px-3 py-1.5 text-xs font-medium capitalize text-primary"
+          >
+            {value}
+            <X className="size-3" onClick={(e) => { e.stopPropagation(); onChange(""); }} />
+          </button>
+        )}
+
+        {/* Custom input */}
+        {customMode ? (
+          <div className="flex items-center gap-1">
+            <input
+              ref={inputRef}
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); commitCustom(); }
+                if (e.key === "Escape") setCustomMode(false);
+              }}
+              onBlur={commitCustom}
+              placeholder="e.g. corruption"
+              maxLength={40}
+              className="h-7 w-28 rounded-xl border border-primary bg-card px-2.5 text-xs text-card-foreground outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setCustomMode(true); setCustomInput(""); }}
+            className="flex items-center gap-1 rounded-xl border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            <Plus className="size-3" /> Other
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 export default function SubmitPage() {
-  const [type, setType] = useState<SubmitType>("text");
+  const [type, setType]         = useState<SubmitType>("text");
   const [submitted, setSubmitted] = useState(false);
-
-  // Text fields
-  const [content, setContent] = useState("");
+  const [content, setContent]   = useState("");
   const [language, setLanguage] = useState<ReportLanguage>("en");
   const [category, setCategory] = useState("");
-
-  // Location
-  const [locationCode, setLocationCode] = useState("");
-  const [detectingGeo, setDetectingGeo] = useState(false);
-  const [geoLabel, setGeoLabel] = useState<string | null>(null);
-
-  // File / camera
-  const [file, setFile] = useState<File | null>(null);
+  const [location, setLocation] = useState<ResolvedLocation | null>(null);
+  const [file, setFile]         = useState<File | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const videoRef  = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const voiceInputRef = useRef<HTMLInputElement>(null);
 
-  // Hooks
-  const createText = useCreateTextReport();
+  const createText  = useCreateTextReport();
   const createVoice = useCreateVoiceReport();
   const createPhoto = useCreatePhotoReport();
-
   const isLoading = createText.isLoading || createVoice.isLoading || createPhoto.isLoading;
 
-  // ----- geo detection -----
-  const detectLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      toast.warning("Geolocation is not supported by your browser");
-      return;
-    }
-    setDetectingGeo(true);
+  // Auto-detect location on first mount (silent — no toast, just fills the picker)
+  useEffect(() => {
+    if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        // Reverse-geocode with a free API to get a human-readable label
+      async ({ coords }) => {
         try {
+          const { kenyaLocations } = await import("ke-locations-data");
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json&accept-language=en`,
           );
           const data = await res.json();
-          const suburb =
-            data.address?.suburb ||
-            data.address?.neighbourhood ||
-            data.address?.village ||
-            data.address?.county ||
-            "";
-          const city = data.address?.city || data.address?.town || "";
-          setGeoLabel([suburb, city].filter(Boolean).join(", ") || "Location detected");
-          setLocationCode(`${latitude.toFixed(5)},${longitude.toFixed(5)}`);
-        } catch {
-          setGeoLabel("Location detected");
-          setLocationCode(`${latitude.toFixed(5)},${longitude.toFixed(5)}`);
-        }
-        setDetectingGeo(false);
-        toast.success("Location detected");
+          const addr = data.address ?? {};
+          const candidates = [
+            addr.city_district, addr.suburb, addr.neighbourhood,
+            addr.quarter, addr.village, addr.town, addr.county,
+          ].filter(Boolean) as string[];
+          for (const term of candidates) {
+            const hits = kenyaLocations.search(term, 3);
+            if (hits.length) {
+              const best = hits[0]!;
+              const i = best.item as unknown as Record<string, string>;
+              setLocation({
+                location_type: best.type as ResolvedLocation["location_type"],
+                location_code: i.code!,
+                location_name: i.name!,
+                county_code: i.county_code ?? null,
+                county_name: i.county_name ?? null,
+                constituency_code: i.constituency_code ?? null,
+                constituency_name: i.constituency_name ?? null,
+                locality_code: best.type === "locality" ? i.code! : (i.locality ?? null),
+                locality_name: best.type === "locality" ? i.name! : (i.locality ?? null),
+              });
+              return;
+            }
+          }
+        } catch { /* silent auto-detect failure */ }
       },
-      (err) => {
-        setDetectingGeo(false);
-        toast.error("Could not detect location", { description: err.message });
-      },
-      { timeout: 10_000 }
+      () => { /* denied — that's fine */ },
+      { timeout: 8000 },
     );
   }, []);
 
-  // ----- camera -----
+  // Camera helpers
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -180,13 +253,10 @@ export default function SubmitPage() {
       });
       streamRef.current = stream;
       setCameraActive(true);
-      // Attach after state updates paint the <video>
-      setTimeout(() => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      }, 50);
+      setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 50);
     } catch {
       toast.error("Camera access denied", {
-        description: "Please allow camera access in your browser settings.",
+        description: "Allow camera access in your browser settings.",
       });
     }
   }, []);
@@ -205,167 +275,122 @@ export default function SubmitPage() {
     canvas.getContext("2d")!.drawImage(videoRef.current, 0, 0);
     canvas.toBlob((blob) => {
       if (!blob) return;
-      const captured = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
-      setFile(captured);
+      setFile(new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" }));
       stopCamera();
       toast.success("Photo captured");
     }, "image/jpeg", 0.92);
   }, [stopCamera]);
 
-  // ----- type switch — clear file & stop camera -----
   const handleTypeChange = useCallback((v: SubmitType) => {
-    setType(v);
-    setFile(null);
+    setType(v); setFile(null);
     if (cameraActive) stopCamera();
   }, [cameraActive, stopCamera]);
 
-  // ----- submit -----
+  // Submit
   const handleSubmit = async () => {
+    const locationFields = location
+      ? {
+          location_type: location.location_type,
+          location_code: location.location_code,
+        }
+      : {};
+
     if (type === "text") {
       if (content.trim().length < 5) {
-        toast.error("Report too short", { description: "Please write at least 5 characters." });
+        toast.error("Too short", { description: "Write at least 5 characters." });
         return;
       }
-      const result = await createText.execute({ content_text: content, language });
-      if (!result.success) {
-        toast.error("Failed to submit report", { description: result.message });
-        return;
-      }
+      const r = await createText.execute({ content_text: content, language, ...locationFields });
+      if (!r.success) { toast.error("Failed to submit", { description: r.message }); return; }
     }
 
     if (type === "voice") {
-      if (!file) {
-        toast.error("No file selected", { description: "Please upload a voice note." });
-        return;
-      }
-      const result = await createVoice.execute({}, file);
-      if (!result.success) {
-        toast.error("Failed to submit voice report", { description: result.message });
-        return;
-      }
+      if (!file) { toast.error("No audio", { description: "Record or upload a voice note." }); return; }
+      const r = await createVoice.execute(locationFields, file);
+      if (!r.success) { toast.error("Failed to submit", { description: r.message }); return; }
     }
 
     if (type === "photo") {
-      if (!file) {
-        toast.error("No photo selected", { description: "Please upload or take a photo." });
-        return;
-      }
-      const result = await createPhoto.execute({ caption: content || undefined }, file);
-      if (!result.success) {
-        toast.error("Failed to submit photo report", { description: result.message });
-        return;
-      }
+      if (!file) { toast.error("No photo", { description: "Take or upload a photo." }); return; }
+      const r = await createPhoto.execute({ caption: content || undefined, ...locationFields }, file);
+      if (!r.success) { toast.error("Failed to submit", { description: r.message }); return; }
     }
 
     setSubmitted(true);
   };
 
   const resetForm = () => {
-    setSubmitted(false);
-    setContent("");
-    setFile(null);
-    setCategory("");
-    setLocationCode("");
-    setGeoLabel(null);
-    setType("text");
+    setSubmitted(false); setContent(""); setFile(null);
+    setCategory(""); setLocation(null); setType("text");
   };
 
   if (submitted) return <SuccessScreen onReset={resetForm} />;
 
   return (
-    <div className="mx-auto max-w-xl space-y-6 pb-10">
+    <div className="mx-auto max-w-xl space-y-5 pb-10">
+
       {/* Info banner */}
-      <div className="flex gap-2.5 rounded-lg border border-border bg-muted/50 p-3">
+      <div className="flex gap-2.5 rounded-xl border border-border bg-muted/50 p-3">
         <Info className="mt-0.5 size-4 shrink-0 text-primary" />
-        <p className="text-xs text-muted-foreground">
-          No account needed. Your report is linked to this device — your name and phone
-          number are never required.
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          No account needed. Your report is linked to this device only — no name or phone number required.
         </p>
       </div>
 
-      {/* Report type */}
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Report type
-        </p>
-        <div className="grid grid-cols-3 gap-2">
-          {TYPE_OPTIONS.map(({ value, icon: Icon, label, desc }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => handleTypeChange(value)}
-              className={cn(
-                "flex flex-col items-start gap-1.5 rounded-xl border p-3.5 text-left transition-colors",
-                type === value
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border bg-card text-card-foreground hover:border-primary/40 hover:bg-muted/50"
-              )}
-            >
-              <Icon className={cn("size-4 shrink-0", type === value ? "text-primary" : "text-muted-foreground")} />
-              <span className="text-xs font-semibold">{label}</span>
-              <span className="text-[10px] leading-tight text-muted-foreground">{desc}</span>
-            </button>
-          ))}
-        </div>
+      {/* Type selector */}
+      <div className="grid grid-cols-3 gap-2">
+        {TYPE_OPTIONS.map(({ value, icon: Icon, label, desc }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => handleTypeChange(value)}
+            className={cn(
+              "flex flex-col items-start gap-1.5 rounded-2xl border p-3.5 text-left transition-all active:scale-[0.98]",
+              type === value
+                ? "border-primary bg-primary/5"
+                : "border-border bg-card hover:border-primary/30 hover:bg-muted/50",
+            )}
+          >
+            <Icon className={cn("size-4", type === value ? "text-primary" : "text-muted-foreground")} />
+            <span className={cn("text-xs font-semibold", type === value ? "text-primary" : "text-card-foreground")}>
+              {label}
+            </span>
+            <span className="text-[10px] leading-tight text-muted-foreground">{desc}</span>
+          </button>
+        ))}
       </div>
 
       {/* Category */}
-      <div>
-        <label htmlFor="category" className="mb-2 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Category <span className="normal-case font-normal tracking-normal">(optional)</span>
-        </label>
-        <select
-          id="category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-card-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-        >
-          <option value="">Select a category…</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c} className="capitalize">
-              {c.charAt(0).toUpperCase() + c.slice(1)}
-            </option>
-          ))}
-        </select>
-      </div>
+      <CategoryPicker value={category} onChange={setCategory} />
 
       {/* ---- TEXT ---- */}
       {type === "text" && (
         <div className="space-y-3">
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label htmlFor="content" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Your message
-              </label>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your message</p>
               <span className={cn("text-[11px] tabular-nums", content.length > 4800 ? "text-destructive" : "text-muted-foreground")}>
                 {content.length}/5000
               </span>
             </div>
             <textarea
-              id="content"
               rows={5}
               maxLength={5000}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Describe the issue in as much detail as you can…"
-              className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="w-full resize-none rounded-2xl border border-border bg-card px-4 py-3 text-sm text-card-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
-
-          {/* Language */}
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             {LANGUAGES.map((l) => (
-              <button
-                key={l.value}
-                type="button"
-                onClick={() => setLanguage(l.value)}
+              <button key={l.value} type="button" onClick={() => setLanguage(l.value)}
                 className={cn(
-                  "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                  "rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors",
                   language === l.value
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card text-muted-foreground hover:bg-muted"
-                )}
-              >
+                    : "border-border bg-card text-muted-foreground hover:bg-muted",
+                )}>
                 {l.label}
               </button>
             ))}
@@ -376,66 +401,22 @@ export default function SubmitPage() {
       {/* ---- VOICE ---- */}
       {type === "voice" && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Voice note file
-          </p>
-          {file ? (
-            <FilePreview file={file} onRemove={() => setFile(null)} />
-          ) : (
-            <label
-              htmlFor="voice-file"
-              className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-card p-8 text-center transition-colors hover:border-primary/40 hover:bg-muted/50"
-            >
-              <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                <Mic className="size-5 text-muted-foreground" />
-              </div>
-              <div>
-                <span className="text-sm font-medium text-card-foreground">
-                  Click to upload voice note
-                </span>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  MP3, M4A, OGG, OPUS, WAV · Max 15 MB
-                </p>
-              </div>
-              <input
-                ref={voiceInputRef}
-                id="voice-file"
-                type="file"
-                accept="audio/*"
-                className="sr-only"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  if (f.size > 15 * 1024 * 1024) {
-                    toast.error("File too large", { description: "Maximum size is 15 MB." });
-                    return;
-                  }
-                  setFile(f);
-                }}
-              />
-            </label>
-          )}
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Voice note</p>
+          <VoiceRecorder file={file} onFile={setFile} onRemove={() => setFile(null)} />
         </div>
       )}
 
       {/* ---- PHOTO ---- */}
       {type === "photo" && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Photo
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Photo</p>
 
           {/* Camera view */}
           {cameraActive && (
-            <div className="overflow-hidden rounded-xl border border-border">
+            <div className="overflow-hidden rounded-2xl border border-border">
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="aspect-video w-full object-cover"
-              />
-              <div className="flex items-center justify-between bg-card p-3">
+              <video ref={videoRef} autoPlay playsInline className="aspect-video w-full object-cover" />
+              <div className="flex items-center justify-between bg-card px-3 py-2">
                 <Button variant="ghost" size="sm" onClick={stopCamera} className="gap-1.5 text-xs">
                   <X className="size-3.5" /> Cancel
                 </Button>
@@ -446,45 +427,32 @@ export default function SubmitPage() {
             </div>
           )}
 
-          {/* File preview */}
           {!cameraActive && file && (
-            <FilePreview file={file} onRemove={() => setFile(null)} />
+            <PhotoPreview file={file} onRemove={() => setFile(null)} />
           )}
 
-          {/* Upload / camera buttons */}
           {!cameraActive && !file && (
             <div className="grid grid-cols-2 gap-3">
-              <label
-                htmlFor="photo-file"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-card p-5 text-center transition-colors hover:border-primary/40 hover:bg-muted/50"
-              >
-                <Upload className="size-5 text-muted-foreground" />
+              <label htmlFor="photo-file"
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card p-5 text-center transition-colors hover:border-primary/40 hover:bg-muted/50">
+                <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                  <Upload className="size-4 text-muted-foreground" />
+                </div>
                 <span className="text-xs font-medium text-card-foreground">Upload photo</span>
                 <span className="text-[10px] text-muted-foreground">JPG, PNG, WEBP · 15 MB</span>
-                <input
-                  ref={fileInputRef}
-                  id="photo-file"
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
+                <input ref={fileInputRef} id="photo-file" type="file" accept="image/*" className="sr-only"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    if (f.size > 15 * 1024 * 1024) {
-                      toast.error("File too large", { description: "Maximum size is 15 MB." });
-                      return;
-                    }
+                    if (f.size > 15 * 1024 * 1024) { toast.error("Too large", { description: "Max 15 MB." }); return; }
                     setFile(f);
-                  }}
-                />
+                  }} />
               </label>
-
-              <button
-                type="button"
-                onClick={startCamera}
-                className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-card p-5 text-center transition-colors hover:border-primary/40 hover:bg-muted/50"
-              >
-                <Camera className="size-5 text-muted-foreground" />
+              <button type="button" onClick={startCamera}
+                className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card p-5 text-center transition-colors hover:border-primary/40 hover:bg-muted/50">
+                <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                  <Camera className="size-4 text-muted-foreground" />
+                </div>
                 <span className="text-xs font-medium text-card-foreground">Take photo</span>
                 <span className="text-[10px] text-muted-foreground">Use your camera</span>
               </button>
@@ -492,77 +460,36 @@ export default function SubmitPage() {
           )}
 
           {/* Optional caption */}
-          <div>
-            <label htmlFor="caption" className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Caption <span className="normal-case font-normal tracking-normal">(optional)</span>
-            </label>
-            <input
-              id="caption"
-              type="text"
-              maxLength={500}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Describe what the photo shows…"
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
+          {(file || cameraActive) && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Caption <span className="normal-case font-normal tracking-normal">(optional)</span>
+              </p>
+              <input type="text" maxLength={500} value={content} onChange={(e) => setContent(e.target.value)}
+                placeholder="Describe what the photo shows…"
+                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+            </div>
+          )}
         </div>
       )}
 
       {/* Location */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Location <span className="normal-case font-normal tracking-normal">(optional)</span>
+          Location <span className="normal-case font-normal tracking-normal">(auto-detected · tap to change)</span>
         </p>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <MapPin className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={geoLabel ?? locationCode}
-              onChange={(e) => { setLocationCode(e.target.value); setGeoLabel(null); }}
-              placeholder="e.g. Kangemi Ward, Westlands"
-              className="w-full rounded-lg border border-border bg-card py-2 pl-8 pr-3 text-sm text-card-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={detectLocation}
-            disabled={detectingGeo}
-            className="shrink-0 gap-1.5 text-xs"
-          >
-            {detectingGeo ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <MapPin className="size-3.5" />
-            )}
-            {detectingGeo ? "Detecting…" : "Detect"}
-          </Button>
-        </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">
+        <LocationPicker value={location} onChange={setLocation} />
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
           AI will also attempt to detect your location from the report content.
         </p>
       </div>
 
       {/* Submit */}
-      <Button
-        className="w-full gap-2"
-        size="lg"
-        onClick={handleSubmit}
-        disabled={isLoading}
-      >
+      <Button className="w-full gap-2" size="lg" onClick={handleSubmit} disabled={isLoading}>
         {isLoading ? (
-          <>
-            <Loader2 className="size-4 animate-spin" />
-            Submitting…
-          </>
+          <><Loader2 className="size-4 animate-spin" /> Submitting…</>
         ) : (
-          <>
-            <Send className="size-4" />
-            Submit Report
-          </>
+          <><Send className="size-4" /> Submit Report</>
         )}
       </Button>
     </div>
