@@ -10,10 +10,10 @@ import {
 } from './ai.types';
 
 // gemma-4-31b-it handles text and image classification — cheap enough to
-// run on every submission. gemini-2.0-flash-001 is used only for voice
-// transcription because Gemma does not support audio input modality.
-const MODEL       = 'gemma-4-12b-it';
-const AUDIO_MODEL = 'gemma-4-12b-it';
+// run on every submission. gemma-4-4b-it is used only for voice
+// transcription because gemma-4-31b-it does not support audio input modality.
+const MODEL       = 'gemma-4-31b-it';
+const AUDIO_MODEL = 'gemma-4-4b-it';
 
 @Injectable()
 export class AiService {
@@ -95,7 +95,8 @@ Respond with ONLY JSON, no markdown fences:
 }
 Set "mentionedLocation" to null if no place is named in the recording — never guess.`;
 
-    // Audio requires gemini-2.0-flash — Gemma models do not support audio input.
+        // Using Gemma 4's native multimodal capabilities 
+    // to process audio directly, ensuring a unified Gemma-powered pipeline.
     return this.generateJson<AiTranscriptionResult>(
       [
         { text: prompt },
