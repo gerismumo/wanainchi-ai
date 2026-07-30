@@ -1,10 +1,10 @@
-import Link from "next/link";
-import { MapPin, ArrowRight } from "lucide-react";
-import { Hero } from "@/components/landing/hero";
-import { Features } from "@/components/landing/features";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { ModeToggle } from "@/components/mode-toggle";
-import { Button } from "@/components/ui/button";
+import Link from 'next/link';
+import { MapPin, ArrowRight } from 'lucide-react';
+import { Hero } from '@/components/landing/hero';
+import { Features } from '@/components/landing/features';
+import { HowItWorks } from '@/components/landing/how-it-works';
+import { ModeToggle } from '@/components/mode-toggle';
+import { Button } from '@/components/ui/button';
 
 export default function LandingPage() {
   return (
@@ -23,12 +23,15 @@ export default function LandingPage() {
         <div className="flex items-center gap-2">
           <ModeToggle />
           {/* Dashboard link: text on sm+, icon-only implicitly hidden when space is tight */}
-          <Button variant="outline" size="sm" >
-            <Link href="/dashboard" className="hidden sm:inline-flex">
-              Dashboard
-            </Link>
-          </Button>
-          <Button size="sm" >
+          <div className="hidden sm:inline-flex">
+            <Button variant="outline" size="sm">
+              <Link href="/dashboard" className="hidden sm:inline-flex">
+                Dashboard
+              </Link>
+            </Button>
+          </div>
+
+          <Button size="sm">
             <Link href="/submit" className="flex items-center gap-1.5">
               <span className="hidden xs:inline">Report Issue</span>
               <span className="inline xs:hidden">Report</span>
@@ -56,13 +59,13 @@ export default function LandingPage() {
           holds leaders accountable. Your voice is the data.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button size="lg" >
+          <Button size="lg">
             <Link href="/submit" className="flex items-center gap-2">
               <MapPin className="size-4" />
               Submit Your First Report
             </Link>
           </Button>
-          <Button variant="outline" size="lg" >
+          <Button variant="outline" size="lg">
             <Link href="/dashboard">Explore the Dashboard</Link>
           </Button>
         </div>
@@ -74,10 +77,16 @@ export default function LandingPage() {
           <div className="flex size-6 items-center justify-center rounded bg-primary">
             <MapPin className="size-3 text-primary-foreground" />
           </div>
-          <span className="text-xs font-semibold text-foreground">WananchiAI</span>
-          <span className="text-xs text-muted-foreground">· Civic Intelligence Platform</span>
+          <span className="text-xs font-semibold text-foreground">
+            WananchiAI
+          </span>
+          <span className="text-xs text-muted-foreground">
+            · Civic Intelligence Platform
+          </span>
         </div>
-        <p className="text-xs text-muted-foreground">Powered by Gemma 4 · Built for Kenya</p>
+        <p className="text-xs text-muted-foreground">
+          Powered by Gemma 4 · Built for Kenya
+        </p>
       </footer>
     </div>
   );

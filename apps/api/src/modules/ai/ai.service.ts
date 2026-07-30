@@ -12,8 +12,8 @@ import {
 // gemma-4-31b-it handles text and image classification — cheap enough to
 // run on every submission. gemini-2.0-flash-001 is used only for voice
 // transcription because Gemma does not support audio input modality.
-const MODEL       = 'gemma-4-31b-it';
-const AUDIO_MODEL = 'gemini-2.0-flash-001';
+const MODEL       = 'gemma-4-12b-it';
+const AUDIO_MODEL = 'gemma-4-12b-it';
 
 @Injectable()
 export class AiService {

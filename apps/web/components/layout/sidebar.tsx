@@ -9,20 +9,21 @@ import {
   MapPin,
   Activity,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Reports", href: "/reports", icon: FileText },
-  { label: "Submit Report", href: "/submit", icon: PlusCircle },
+  { label: "Dashboard",    href: "/dashboard", icon: LayoutDashboard },
+  { label: "Reports",      href: "/reports",   icon: FileText },
+  { label: "AI Digests",   href: "/digests",   icon: Sparkles },
+  { label: "Submit Report",href: "/submit",    icon: PlusCircle },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    // Hidden on mobile — navigation handled by BottomNav instead
     <aside className="hidden md:flex h-full w-60 flex-col border-r border-border bg-sidebar">
       {/* Brand */}
       <div className="flex items-center gap-2.5 border-b border-border px-5 py-4">
@@ -53,14 +54,10 @@ export function Sidebar() {
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
-              <Icon
-                className={cn(
-                  "size-4 shrink-0",
-                  active
-                    ? "text-sidebar-primary"
-                    : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
-                )}
-              />
+              <Icon className={cn(
+                "size-4 shrink-0",
+                active ? "text-sidebar-primary" : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
+              )} />
               <span className="flex-1">{label}</span>
               {active && <ChevronRight className="size-3 text-sidebar-primary" />}
             </Link>
