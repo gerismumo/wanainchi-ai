@@ -59,6 +59,9 @@ importers:
       minio:
         specifier: ^8.0.7
         version: 8.0.7
+      multer:
+        specifier: ^2.2.0
+        version: 2.2.0
       nestjs-knex:
         specifier: ^3.0.0
         version: 3.0.0(@nestjs/common@11.1.28)(@nestjs/core@11.1.28)(knex@3.3.0)

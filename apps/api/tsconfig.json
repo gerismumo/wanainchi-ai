@@ -3,6 +3,10 @@
   "compilerOptions": {
     "baseUrl": "./",
     "outDir": "./dist",
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "typeRoots": [
+      "./src/common/types/express",
+      "./node_modules/@types"
+    ]
   }
 }

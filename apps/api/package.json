@@ -37,6 +37,7 @@
     "ke-locations-data": "^0.0.5",
     "knex": "^3.3.0",
     "minio": "^8.0.7",
+    "multer": "^2.2.0",
     "nestjs-knex": "^3.0.0",
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
