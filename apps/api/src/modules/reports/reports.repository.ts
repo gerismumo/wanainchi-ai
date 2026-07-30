@@ -105,7 +105,7 @@ export class ReportsRepository {
     } = filters;
 
     const applyFilters = (qb: Knex.QueryBuilder) => {
-      if (!includeSpam) qb.andWhere('r.is_spam', false);
+      if (includeSpam) qb.andWhere('r.is_spam', false);
       if (status) qb.andWhere('r.status', status);
       if (category) qb.andWhere('r.category', category);
       if (sentiment) qb.andWhere('r.sentiment', sentiment);
