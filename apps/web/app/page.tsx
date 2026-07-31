@@ -45,7 +45,6 @@ export default function LandingPage() {
       <Hero />
       <Features />
       <HowItWorks />
-
       {/* CTA section */}
       <section className="border-b border-border bg-muted/30 px-4 py-12 text-center sm:px-6 sm:py-16">
         <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary">

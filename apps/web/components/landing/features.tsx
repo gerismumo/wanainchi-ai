@@ -28,9 +28,9 @@ const features = [
   },
   {
     icon: Globe,
-    title: "Multimodal Submission",
+    title: "Multilingual by Design",
     description:
-      "Citizens submit via WhatsApp, SMS, or the web in English or Kiswahili — voice, text, and photo all supported.",
+      "Citizens submit via WhatsApp, SMS, or the web in any Kenyan language — English, Kiswahili, Sheng, Gikuyu, Dholuo, and 9 more. Voice, text, and photo all supported.",
   },
   {
     icon: ShieldCheck,

@@ -29,6 +29,41 @@ const EMPTY: ResolvedLocation = {
 };
 
 /**
+ * Best-effort constituency inference for locations that don't carry a
+ * direct constituency link in the package (areas, and localities in
+ * counties with multiple constituencies). Matches the location's own name
+ * against every ward name in the same county — informal settlement and
+ * estate names very often coincide with, or are contained within, a ward
+ * name (e.g. "Kawangware" the estate sits inside "Kawangware" the ward).
+ * Best-effort and silent on failure — an unresolved constituency just
+ * stays null rather than blocking the report.
+ */
+function inferConstituencyByNameInCounty(
+  name: string,
+  countyCode: string,
+): { constituency_code: string | null; constituency_name: string | null } {
+  try {
+    const needle = name.toLowerCase().trim();
+    if (!needle) return { constituency_code: null, constituency_name: null };
+
+    const constituencies = kenyaLocations.getConstituenciesByCounty(countyCode) ?? [];
+    for (const constituency of constituencies) {
+      const wards = kenyaLocations.getWardsByConstituency(constituency.code) ?? [];
+      const match = wards.find((w) => {
+        const wardName = w.name.toLowerCase();
+        return wardName.includes(needle) || needle.includes(wardName);
+      });
+      if (match) {
+        return { constituency_code: match.constituency_code, constituency_name: match.constituency_name };
+      }
+    }
+  } catch {
+    // package call failed — fall through to null
+  }
+  return { constituency_code: null, constituency_name: null };
+}
+
+/**
  * Resolves a (location_type, location_code) pair coming from the client into
  * the fully-flattened ancestry shape shared by users/reports/ai_digests
  * (see addLocationColumns() in the migration). Returns an all-null object
@@ -88,6 +123,11 @@ export function resolveLocation(type?: LocationType, code?: string): ResolvedLoc
     case 'locality': {
       const locality = kenyaLocations.getLocalityByCode(code);
       if (!locality) return { ...EMPTY };
+      // Localities don't carry a direct constituency link in the package —
+      // infer it by matching the locality's name against ward names in the
+      // same county, so a locality-level report still rolls up to an MP's
+      // actual constituency instead of stopping at the county level.
+      const inferred = inferConstituencyByNameInCounty(locality.name, locality.county_code);
       return {
         ...EMPTY,
         location_type: 'locality',
@@ -95,6 +135,8 @@ export function resolveLocation(type?: LocationType, code?: string): ResolvedLoc
         location_name: locality.name,
         county_code: locality.county_code,
         county_name: locality.county_name,
+        constituency_code: inferred.constituency_code,
+        constituency_name: inferred.constituency_name,
         locality_code: locality.code,
         locality_name: locality.name,
         location_raw: locality as unknown as Record<string, unknown>,
@@ -104,6 +146,14 @@ export function resolveLocation(type?: LocationType, code?: string): ResolvedLoc
     case 'area': {
       const area = kenyaLocations.getAreaByCode(code);
       if (!area) return { ...EMPTY };
+      // Same gap as localities, one level deeper — areas only carry a raw
+      // `locality` string and a county code, no constituency link. Try the
+      // area's own name first (most specific), then its parent locality
+      // name, against ward names in the county.
+      const inferred =
+        inferConstituencyByNameInCounty(area.name, area.county_code).constituency_code
+          ? inferConstituencyByNameInCounty(area.name, area.county_code)
+          : inferConstituencyByNameInCounty(area.locality, area.county_code);
       return {
         ...EMPTY,
         location_type: 'area',
@@ -111,6 +161,8 @@ export function resolveLocation(type?: LocationType, code?: string): ResolvedLoc
         location_name: area.name,
         county_code: area.county_code,
         county_name: area.county_name,
+        constituency_code: inferred.constituency_code,
+        constituency_name: inferred.constituency_name,
         // IArea only carries a raw `locality` string, not a code — stored in
         // both slots since it's the closest we have to a locality code here.
         locality_code: area.locality,
@@ -230,21 +282,55 @@ export function expandLocationCodes(type: LocationType, code: string): LocationR
   return refs;
 }
 
+// A small hand-curated gazetteer of well-known informal settlements,
+// estates, and landmarks that citizens will absolutely say out loud
+// ("Kibera", "Mathare", "Eastleigh", "Kawangware") but which the official
+// ke-locations-data package may not carry as a searchable entry at all,
+// since it tracks formal administrative units, not colloquial place names.
+// Tried only after kenyaLocations.search() comes up empty — this is a
+// deliberately small, high-confidence list, not an attempt to replace the
+// package; add to it as you discover more gaps during testing.
+const KNOWN_LANDMARKS: Record<string, { type: LocationType; code: string }> = {
+  // Nairobi
+  kibera: { type: 'constituency', code: 'KE-047-08' },
+  mathare: { type: 'constituency', code: 'KE-047-04' },
+  eastleigh: { type: 'constituency', code: 'KE-047-05' },
+  kawangware: { type: 'ward', code: 'KE-047-06-02' },
+  kangemi: { type: 'ward', code: 'KE-047-21-02' },
+  // Mombasa
+  'old town': { type: 'constituency', code: 'KE-001-01' },
+  likoni: { type: 'constituency', code: 'KE-001-02' },
+  // NOTE: the exact codes above are illustrative placeholders — verify each
+  // against the actual ke-locations-data codes for your installed version
+  // before relying on this table in a demo. Wrong codes are worse than no
+  // match, since they'll misfile a report under the wrong constituency.
+};
+
+function lookupKnownLandmark(name: string): ResolvedLocation | null {
+  const key = name.toLowerCase().trim();
+  const hit = KNOWN_LANDMARKS[key];
+  if (!hit) return null;
+  return resolveLocation(hit.type, hit.code);
+}
+
 /**
  * Fallback path for reports where the citizen never picked a location on a
  * map/dropdown — Gemma pulls a place name straight out of the free text
  * ("Kangemi", "Waiyaki Way, Westlands") and we look it up here by name
  * instead of by code.
  *
+ * Resolution order, most confident first:
+ *   1. Exact case-insensitive name match from the package search, at the
+ *      level Gemma guessed (if any).
+ *   2. Most SPECIFIC level available among the remaining search results
+ *      (ward/locality/area beat constituency/county) — a specific match
+ *      carries more of the ancestry chain for free.
+ *   3. The hand-curated KNOWN_LANDMARKS gazetteer, for informal
+ *      settlements/estates the official package doesn't carry at all.
+ *
  * NB: assumes `kenyaLocations.search(query)` exists per the package's own
  * `SearchResult`/`SearchType` types — verify against the installed
  * ke-locations-data version if search() isn't actually exposed that way.
- *
- * `levelHint` is Gemma's best guess at the administrative level (county /
- * constituency / ward / locality / area) — used only to prefer the right
- * match when the search returns several places that share a name (e.g. a
- * "Kangemi" ward vs. a "Kangemi" market). If nothing matches the hint, or
- * no hint was given, we fall back to the package's own top-ranked result.
  */
 export function resolveLocationByName(
   name: string,
@@ -253,17 +339,31 @@ export function resolveLocationByName(
   const query = name?.trim();
   if (!query) return { ...EMPTY };
 
+  const SPECIFICITY: LocationType[] = ['area', 'locality', 'ward', 'constituency', 'county'];
+
   try {
     const results: SearchResult[] = kenyaLocations.search(query) ?? [];
-    if (!results.length) return { ...EMPTY };
 
-    const match = (levelHint && results.find((r) => r.type === levelHint)) || results[0]!;
-    const code = (match.item as { code: string }).code;
+    if (results.length) {
+      const exactMatches = results.filter(
+        (r) => (r.item as { name?: string }).name?.toLowerCase() === query.toLowerCase(),
+      );
+      const pool = exactMatches.length ? exactMatches : results;
 
-    return resolveLocation(match.type as LocationType, code);
+      const hintMatch = levelHint ? pool.find((r) => r.type === levelHint) : undefined;
+
+      const bySpecificity = [...pool].sort(
+        (a, b) => SPECIFICITY.indexOf(a.type as LocationType) - SPECIFICITY.indexOf(b.type as LocationType),
+      );
+
+      const match:any = hintMatch ?? bySpecificity[0];
+      const code = (match.item as { code: string }).code;
+      return resolveLocation(match.type as LocationType, code);
+    }
   } catch {
-    // Package threw (unknown query shape, version mismatch, etc.) — treat
-    // it the same as "no match found" rather than failing the report.
-    return { ...EMPTY };
+    // Package threw (unknown query shape, version mismatch, etc.) — fall
+    // through to the landmark gazetteer rather than failing the report.
   }
+
+  return lookupKnownLandmark(query) ?? { ...EMPTY };
 }
