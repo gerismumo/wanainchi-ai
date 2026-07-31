@@ -13,14 +13,15 @@
    - 3b. Voice report
    - 3c. Photo report
 4. [AI Pipeline — How Each Report is Processed](#4-ai-pipeline)
-5. [Location Resolution with ke-locations-data](#5-location-resolution)
-6. [Spam Detection & Abuse Logging](#6-spam-detection--abuse-logging)
-7. [Device Trust Score](#7-device-trust-score)
-8. [Duplicate Detection](#8-duplicate-detection)
-9. [Votes](#9-votes)
-10. [AI Digests — From Reports to an MP's Briefing](#10-ai-digests)
-11. [API Endpoint Reference](#11-api-endpoint-reference)
-12. [Flowcharts](#12-flowcharts)
+5. [File Storage — MinIO](#5a-file-storage--minio)
+6. [Location Resolution with ke-locations-data](#5-location-resolution)
+7. [Spam Detection & Abuse Logging](#6-spam-detection--abuse-logging)
+8. [Device Trust Score](#7-device-trust-score)
+9. [Duplicate Detection](#8-duplicate-detection)
+10. [Votes](#9-votes)
+11. [AI Digests — From Reports to an MP's Briefing](#10-ai-digests)
+12. [API Endpoint Reference](#11-api-endpoint-reference)
+13. [Flowcharts](#12-flowcharts)
 
 ---
 
@@ -138,20 +139,31 @@ The audio is kept in memory (`memStorage`) — never written to disk before proc
 **Flow:**
 
 ```
-Client submits audio file
+Client submits audio file (held in memory — never written to disk)
   → resolveDevice + guardRateLimit
-  → storage.handleReportUpload(file)      ← upload to MinIO, get URL
+  → storage.handleReportUpload(file)
+      ┌─────────────────────────────────────────────────────────┐
+      │  MinIO storage                                          │
+      │  • validate mimetype (audio/webm, audio/ogg, mp3, …)   │
+      │  • validate size ≤ 15 MB                               │
+      │  • putObject → bucket/reports/<uuid>.<ext>              │
+      │  • returns public URL:                                  │
+      │    {MINIO_PUBLIC_URL}/{bucket}/reports/<uuid>.<ext>     │
+      └─────────────────────────────────────────────────────────┘
+      media_url = returned URL (stored permanently on the report)
   → ai.transcribeVoice(buffer, mimetype)  ← Gemini 3.6 Flash (audio model)
+      Note: the original buffer (still in memory) is sent to Gemini
+            as base64 inlineData — Gemini never reads from MinIO
       returns: transcript, detectedLanguage, mentionedLocation
   → ai.analyzeText(transcript)            ← Gemma 4 31B classifies the transcript
       returns: category, summary, sentiment, urgencyScore, isSpam, …
   → resolveReportLocation(dto, mentionedLocation)
   → repo.create({ type: 'voice', media_url, content_text: transcript, … })
   → finalizeReport
-  → return ReportPublic
+  → return ReportPublic (includes media_url so the frontend can play the audio)
 ```
 
-Audio transcription uses **Gemini 3.6 Flash** (the only model in the stack with audio input support). The transcript is then piped into the same text classification as a regular text report.
+Audio transcription uses **Gemini 3.6 Flash** (the only model in the stack with audio input support). The transcript is then piped into the same text classification as a regular text report. The original audio file is kept in MinIO permanently so moderators or MPs can listen to the source recording when reviewing a report.
 
 ---
 
@@ -170,20 +182,32 @@ location_code: "012"                  // optional
 **Flow:**
 
 ```
-Client submits image file
+Client submits image file (held in memory — never written to disk)
   → resolveDevice + guardRateLimit
-  → storage.handleReportUpload(file)      ← upload to MinIO, get URL
-  → ai.analyzeImage(buffer, mimetype, caption)  ← Gemma 4 31B (vision)
+  → storage.handleReportUpload(file)
+      ┌─────────────────────────────────────────────────────────┐
+      │  MinIO storage                                          │
+      │  • validate mimetype (image/jpeg, png, webp, heic, …)  │
+      │  • validate size ≤ 15 MB                               │
+      │  • putObject → bucket/reports/<uuid>.<ext>              │
+      │  • returns public URL:                                  │
+      │    {MINIO_PUBLIC_URL}/{bucket}/reports/<uuid>.<ext>     │
+      └─────────────────────────────────────────────────────────┘
+      media_url = returned URL (stored permanently on the report)
+  → ai.analyzeImage(buffer, mimetype, caption)
+      Note: the original buffer (still in memory) is sent to Gemini
+            as base64 inlineData — Gemini never reads from MinIO
+      ← Gemma 4 31B (vision)
       returns: description, category,
                hasVisibleIssue, isSpam, spamScore,
                mentionedLocation
   → resolveReportLocation(dto, mentionedLocation)
   → repo.create({ type: 'photo', media_url, content_text: caption || description, … })
   → finalizeReport
-  → return ReportPublic
+  → return ReportPublic (includes media_url so the frontend can render the photo)
 ```
 
-The image is passed as a base64 `inlineData` part alongside the classification prompt. Gemma reads visible signage, landmarks, and the optional caption to extract a place name.
+The image is passed as a base64 `inlineData` part alongside the classification prompt. Gemma reads visible signage, landmarks, and the optional caption to extract a place name. The original photo file is kept in MinIO permanently as evidence — anyone viewing the report on the dashboard sees the actual photo taken in the field.
 
 ---
 
@@ -234,6 +258,52 @@ The image is passed as a base64 `inlineData` part alongside the classification p
 ### Graceful degradation
 
 If Gemini throws (network error, quota exceeded, model refusal), the report is **still saved** with safe defaults (category `other`, urgencyScore `0.3`, isSpam `false`). The error is logged but the citizen gets a success response. This ensures a network hiccup at Gemini never blocks a legitimate submission.
+
+---
+
+## 5a. File Storage — MinIO
+
+Before any AI processing runs on a voice or photo report, the raw file is uploaded to **MinIO** (an S3-compatible object store). MinIO is the permanent home for all media files — Gemini is given the buffer directly from memory and never reads from MinIO.
+
+```
+File lifecycle:
+
+  Browser          API memory          MinIO                  PostgreSQL
+  ──────           ──────────          ─────                  ──────────
+  multipart  ──►  file.buffer    ──►  bucket/reports/    ──►  media_url column
+  upload           (never disk)        <uuid>.<ext>           on the report row
+                        │
+                        └──►  sent to Gemini as base64
+                              for transcription / analysis
+```
+
+### Bucket structure
+
+| Env | Bucket | Folder |
+|---|---|---|
+| Development | `reports-dev` | `reports/` |
+| Production | `reports` | `reports/` |
+
+File names are random UUIDs with the original file extension preserved (e.g. `reports/3f2a1b9c-….webm`).
+
+### Accepted file types
+
+| Category | Formats |
+|---|---|
+| Images | JPEG, PNG, WEBP, JPG, GIF, SVG, BMP, TIFF, HEIC, HEIF, AVIF |
+| Videos | MP4, WebM, MOV, MKV |
+| Audio | WebM, OGG, MP3, WAV, MP4 audio, M4A, AAC, 3GPP, AMR |
+
+Max file size: **15 MB** for reports. Validation happens in `StorageUpload.handleReportUpload()` before upload — an invalid type or oversized file returns HTTP 409 immediately.
+
+### Public URL
+
+The returned URL follows the pattern:
+```
+{MINIO_PUBLIC_URL}/{bucket}/reports/<uuid>.<ext>
+```
+
+This URL is stored in `media_url` on the report row and returned in every `ReportPublic` response. The frontend uses it to render the photo or play back the audio directly from MinIO.
 
 ---
 
@@ -571,10 +641,17 @@ All routes are prefixed `/api`.
                ┌────────────────┼───────────────────────┐
                │ TEXT           │ VOICE                  │ PHOTO
                │                │                        │
+               │        upload to MinIO         upload to MinIO
+               │        bucket/reports/         bucket/reports/
+               │        <uuid>.ext              <uuid>.ext
+               │        → media_url             → media_url
+               │                │                        │
       analyzeText()    transcribeVoice()       analyzeImage()
       Gemma 4 31B      Gemini 3.6 Flash        Gemma 4 31B
-               │          → analyzeText()               │
-               └────────────────┬───────────────────────┘
+      (text only)      (buffer→base64)         (buffer→base64)
+                       → analyzeText()         MinIO file kept as
+                         Gemma 4 31B           evidence / display
+               │                │                        │
                                 │
                     ┌───────────▼───────────────┐
                     │  resolveReportLocation()   │
