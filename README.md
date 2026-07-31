@@ -188,8 +188,8 @@ pnpm db:reset              # Rollback all → migrate → seed
 | `reports` | Submit and query citizen reports (text / voice / photo) |
 | `digests` | AI-generated community summaries by location and period |
 | `analytics` | Aggregated stats and category breakdowns |
-| `auth` | Email / password authentication, JWT |
-| `users` | User profiles and device management |
+| `auth` | Email / password authentication, JWT - not enabled  |
+| `users` | User profiles and device management - not enabled |
 | `devices` | Fingerprint-based device trust scoring |
 | `votes` | Up/down votes on reports |
 | `ai` | Gemini integration — text analysis, transcription, image analysis |
