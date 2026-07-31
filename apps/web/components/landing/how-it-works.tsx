@@ -6,14 +6,14 @@ const steps = [
     icon: Mic,
     title: "Citizens Submit",
     description:
-      "A resident reports a broken water pipe via WhatsApp voice note in Kiswahili. No app, no account, no barrier.",
+      "A resident reports a broken water pipe via WhatsApp voice note — in Kiswahili, Sheng, Dholuo, or any Kenyan language. No app, no account, no barrier.",
   },
   {
     step: "02",
     icon: Cpu,
     title: "AI Processes",
     description:
-      "Gemma 4 transcribes, translates, detects location, assigns category, urgency score, and clusters it with similar reports.",
+      "Gemma 4 transcribes and translates from any Kenyan language, detects location, assigns category, urgency score, and clusters similar reports.",
   },
   {
     step: "03",

@@ -20,7 +20,7 @@ export function Hero() {
       </h1>
 
       <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground sm:mt-5 sm:text-base">
-        Submit a concern via voice, text, or photo in English or Kiswahili. AI
+        Submit a concern via voice, text, or photo — in any Kenyan language. AI
         clusters reports, scores urgency, and delivers evidence-backed
         recommendations straight to MPs and county governments.
       </p>
@@ -56,11 +56,40 @@ export function Hero() {
             <span className="text-xs font-medium text-card-foreground">{label}</span>
           </div>
         ))}
-        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5">
-          <span className="text-xs font-semibold text-primary">EN</span>
-          <span className="text-xs text-muted-foreground">/</span>
-          <span className="text-xs font-semibold text-primary">SW</span>
-          <span className="text-xs font-medium text-card-foreground">Bilingual</span>
+      </div>
+
+      {/* Language strip */}
+      <div className="mt-5">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Submit in any Kenyan language
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {[
+            { code: "EN", label: "English" },
+            { code: "SW", label: "Kiswahili" },
+            { code: "SH", label: "Sheng" },
+            { code: "KI", label: "Gikuyu" },
+            { code: "LUO", label: "Dholuo" },
+            { code: "LUY", label: "Luhya" },
+            { code: "KAM", label: "Kikamba" },
+            { code: "KLN", label: "Kalenjin" },
+            { code: "GUZ", label: "Ekegusii" },
+            { code: "MER", label: "Kimeru" },
+            { code: "MAS", label: "Maa" },
+            { code: "SO", label: "Somali" },
+            { code: "TUV", label: "Turkana" },
+          ].map(({ code, label }) => (
+            <div
+              key={code}
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1"
+            >
+              <span className="text-[10px] font-bold text-primary">{code}</span>
+              <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/50 px-2.5 py-1">
+            <span className="text-[10px] font-medium text-muted-foreground">+ more</span>
+          </div>
         </div>
       </div>
     </section>
