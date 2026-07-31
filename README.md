@@ -1,124 +1,252 @@
-# Turborepo starter
+# Wananchi AI
 
-This is a community-maintained example. If you experience a problem, please submit a pull request with a fix. GitHub Issues will be closed.
+A citizen-reporting platform for Kenya. Residents submit reports — text, voice, or photo — in any language, no account required. Gemini AI classifies each report, detects location from content, filters spam, and periodically generates community digests so local issues surface to the people who can act on them.
 
-## Using this example
+Licensed under the [Apache License 2.0](./LICENSE).
 
-Run the following command:
+---
 
-```bash
-npx create-turbo@latest -e with-nestjs
+## Stack
+
+| Layer | Technology |
+|---|---|
+| API | NestJS 11, Knex, PostgreSQL 16 |
+| Web | Next.js 16, React 19, Tailwind CSS 4 |
+| AI | Google Gemini (`@google/genai`) |
+| Storage | MinIO (S3-compatible) |
+| Monorepo | Turborepo + pnpm workspaces |
+
+---
+
+## Project layout
+
 ```
-
-## What's inside?
-
-This Turborepo includes the following packages & apps:
-
-### Apps and Packages
-
-```shell
 .
 ├── apps
-│   ├── api                       # NestJS app (https://nestjs.com).
-│   └── web                       # Next.js app (https://nextjs.org).
-└── packages
-    ├── @repo/api                 # Shared `NestJS` resources.
-    ├── @repo/eslint-config       # `eslint` configurations (includes `prettier`)
-    ├── @repo/jest-config         # `jest` configurations
-    ├── @repo/typescript-config   # `tsconfig.json`s used throughout the monorepo
-    └── @repo/ui                  # Shareable stub React component library.
+│   ├── api          # NestJS REST API  →  http://localhost:3000
+│   └── web          # Next.js frontend →  http://localhost:3001
+├── packages
+│   ├── @repo/ui               # Shared React component stubs
+│   ├── @repo/eslint-config    # ESLint presets
+│   ├── @repo/jest-config      # Jest presets
+│   └── @repo/typescript-config  # tsconfig bases
+├── docker
+│   └── postgres/init.sql      # Creates dev + test databases
+├── docker-compose.dev.yml     # Local infrastructure (Postgres + MinIO)
+└── docker-compose.prod.yml    # Production stack
 ```
 
-Each package and application are mostly written in [TypeScript](https://www.typescriptlang.org/).
+---
 
-### Utilities
+## Prerequisites
 
-This `Turborepo` has some additional tools already set for you:
+- **Node.js** ≥ 18  
+- **pnpm** 8.15.5 — `npm install -g pnpm@8.15.5`  
+- **Docker** + **Docker Compose** (for local Postgres & MinIO)  
+- A **Google Gemini API key** — [get one here](https://aistudio.google.com/app/apikey)
 
-- [TypeScript](https://www.typescriptlang.org/) for static type-safety
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-- [Jest](https://prettier.io) & [Playwright](https://playwright.dev/) for testing
+---
 
-### Commands
+## Getting started
 
-This `Turborepo` already configured useful commands for all your apps and packages.
-
-#### Build
+### 1 — Clone & install dependencies
 
 ```bash
-# Will build all the app & packages with the supported `build` script.
-pnpm run build
-
-# ℹ️ If you plan to only build apps individually,
-# Please make sure you've built the packages first.
+git clone <repo-url> wanainchi-ai
+cd wanainchi-ai
+pnpm install
 ```
 
-#### Develop
+### 2 — Start local infrastructure
 
 ```bash
-# Will run the development server for all the app & packages with the supported `dev` script.
-pnpm run dev
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-#### test
+This starts:
+- **PostgreSQL 16** on `localhost:5432` (user `postgres`, password `postgres`)
+- **MinIO** S3 API on `localhost:9000`, console at `http://localhost:9001` (user `minioadmin`, password `minioadmin`)
+
+The `init.sql` script automatically creates `wananchiai_dev` and `wananchiai_test` databases on first run.
+
+### 3 — Configure environment variables
+
+**API** — copy and fill in `apps/api/.env`:
 
 ```bash
-# Will launch a test suites for all the app & packages with the supported `test` script.
-pnpm run test
-
-# You can launch e2e testes with `test:e2e`
-pnpm run test:e2e
-
-# See `@repo/jest-config` to customize the behavior.
+cp apps/api/.env.example apps/api/.env
 ```
 
-#### Lint
+```env
+# App
+NODE_ENV=development
+HOST_NAME=localhost
+PORT=3000
+BASE_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3001
 
-```bash
-# Will lint all the app & packages with the supported `lint` script.
-# See `@repo/eslint-config` to customize the behavior.
-pnpm run lint
+# Database
+DB_HOST=localhost
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_PORT=5432
+DB_NAME_DEV=wananchiai_dev
+DB_NAME_TEST=wananchiai_test
+DB_NAME_PROD=wananchiai_prod
+
+# MinIO (matches docker-compose.dev.yml defaults)
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_USESSL=false
+MINIO_ACCESSKEY=minioadmin
+MINIO_SECRETKEY=minioadmin
+MINIO_BUCKET_DEV=reports-dev
+MINIO_BUCKET=reports
+MINIO_PUBLIC_URL=http://localhost:9000
+
+# CORS
+CORS_DEV_ORIGINS=http://localhost:3001
+
+# AI
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-#### Format
+**Web** — copy and fill in `apps/web/.env`:
 
 ```bash
-# Will format all the supported `.ts,.js,json,.tsx,.jsx` files.
-# See `@repo/eslint-config/prettier-base.js` to customize the behavior.
+cp apps/web/.env.example apps/web/.env
+```
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
+
+### 4 — Run database migrations
+
+```bash
+cd apps/api
+pnpm migrate:latest
+```
+
+To also seed sample data:
+
+```bash
+pnpm seed:run
+```
+
+### 5 — Start the development servers
+
+From the repo root:
+
+```bash
+pnpm dev
+```
+
+Turborepo starts both apps in parallel:
+
+| App | URL |
+|---|---|
+| API | http://localhost:3000 |
+| Web | http://localhost:3001 |
+
+---
+
+## Common commands
+
+Run from the **repo root** unless noted.
+
+```bash
+# Development
+pnpm dev                   # Start all apps with hot-reload
+
+# Build
+pnpm build                 # Build all apps and packages
+
+# Test
+pnpm test                  # Unit tests across all packages
+pnpm test:e2e              # End-to-end tests
+
+# Lint & format
+pnpm lint
 pnpm format
+
+# Database (run from apps/api)
+pnpm migrate:latest        # Apply pending migrations
+pnpm migrate:rollback      # Roll back last migration
+pnpm migrate:status        # Show migration state
+pnpm migrate:make <name>   # Create a new migration file
+pnpm seed:run              # Run seeders
+pnpm db:reset              # Rollback all → migrate → seed
 ```
 
-### Remote Caching
+---
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+## API modules
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+| Module | Responsibility |
+|---|---|
+| `reports` | Submit and query citizen reports (text / voice / photo) |
+| `digests` | AI-generated community summaries by location and period |
+| `analytics` | Aggregated stats and category breakdowns |
+| `auth` | Email / password authentication, JWT |
+| `users` | User profiles and device management |
+| `devices` | Fingerprint-based device trust scoring |
+| `votes` | Up/down votes on reports |
+| `ai` | Gemini integration — text analysis, transcription, image analysis |
+| `storage` | MinIO file upload and URL generation |
+| `abuse-logs` | Spam and rate-limit audit trail |
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+All routes are prefixed with `/api`.
+
+---
+
+## Docker
+
+### Development (infrastructure only)
 
 ```bash
-npx turbo login
+# Start Postgres + MinIO
+docker compose -f docker-compose.dev.yml up -d
+
+# Stop
+docker compose -f docker-compose.dev.yml down
+
+# Wipe volumes (fresh start)
+docker compose -f docker-compose.dev.yml down -v
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+### Production
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+Builds are triggered automatically on push to `main` via the GitHub Actions workflow in `.github/workflows/deploy.yml`. The workflow builds both Docker images, runs a health check, and rolls back automatically on failure.
+
+To build and run locally with the production compose file:
 
 ```bash
-npx turbo link
+# Build images
+docker compose -f docker-compose.prod.yml build
+
+# Start stack
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-## Useful Links
+Production env files are expected at:
 
-This example take some inspiration the [with-nextjs](https://github.com/vercel/turborepo/tree/main/examples/with-nextjs) `Turbo` example and [01-cats-app](https://github.com/nestjs/nest/tree/master/sample/01-cats-app) `NestJs` sample.
+```
+/home/apps/wananchiai/.env          # Postgres + MinIO root credentials
+/home/apps/wananchiai/api/.env      # API env
+/home/apps/wananchiai/web/.env      # Web env (NEXT_PUBLIC_API_URL)
+```
 
-Learn more about the power of Turborepo:
+---
 
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+## Contributing
+
+1. Fork the repository and create a branch from `main`.
+2. Make your changes with tests where applicable.
+3. Open a pull request — GitHub Issues will be closed without action.
+
+---
+
+## License
+
+[Apache License 2.0](./LICENSE)
