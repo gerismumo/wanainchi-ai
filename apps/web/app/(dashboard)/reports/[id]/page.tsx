@@ -303,12 +303,12 @@ export default function ReportDetailPage({
           </div>
 
           {/* Status pill */}
-          <span className={cn(
+          {/* <span className={cn(
             "rounded-full border px-3 py-1 text-xs font-semibold",
             STATUS_STYLES[report.status]
           )}>
             {STATUS_LABELS[report.status]}
-          </span>
+          </span> */}
         </div>
 
         {/* AI summary */}
