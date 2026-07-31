@@ -24,11 +24,7 @@ const PRESET_CATEGORIES = [
   "education", "electricity", "sanitation",
 ];
 
-const LANGUAGES: { value: ReportLanguage; label: string }[] = [
-  { value: "en", label: "English" },
-  { value: "sw", label: "Kiswahili" },
-  { value: "sheng", label: "Sheng" },
-];
+
 
 const TYPE_OPTIONS: {
   value: SubmitType;
@@ -382,19 +378,7 @@ export default function SubmitPage() {
               className="w-full resize-none rounded-2xl border border-border bg-card px-4 py-3 text-sm text-card-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <div className="flex gap-1.5">
-            {LANGUAGES.map((l) => (
-              <button key={l.value} type="button" onClick={() => setLanguage(l.value)}
-                className={cn(
-                  "rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors",
-                  language === l.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card text-muted-foreground hover:bg-muted",
-                )}>
-                {l.label}
-              </button>
-            ))}
-          </div>
+          
         </div>
       )}
 

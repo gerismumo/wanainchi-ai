@@ -16,9 +16,11 @@ import { DevicesModule } from './modules/devices/devices.module';
 import { DigestsModule } from './modules/digests/digests.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { VotesModule } from './modules/votes/votes.module';
+import { CategoryDiscoveryModule } from './modules/category-discovery/category-discovery.module';
 
 @Module({
   imports: [
+    CategoryDiscoveryModule,
     AbuseLogsModule,
     AiModule,
     AnalyticsModule,

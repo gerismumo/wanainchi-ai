@@ -7,9 +7,10 @@ import { AiModule } from '../ai/ai.module';
 import { DevicesModule } from '../devices/devices.module';
 import { StorageModule } from '../storage/storage.module';
 import { AbuseLogsModule } from '../abuse-logs/abuse-logs.module';
+import { CategoryDiscoveryModule } from '../category-discovery/category-discovery.module';
 
 @Module({
-  imports: [AiModule, DevicesModule, StorageModule, AbuseLogsModule],
+  imports: [AiModule, DevicesModule, StorageModule, AbuseLogsModule, CategoryDiscoveryModule],
   controllers: [ReportsController],
   providers: [ReportsService, ReportsRepository, ReportsMapper],
   // ReportsRepository is exported alongside the service since votes/comments

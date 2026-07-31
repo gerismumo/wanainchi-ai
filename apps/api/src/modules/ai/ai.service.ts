@@ -10,16 +10,36 @@ import {
 } from './ai.types';
 
 // gemma-4-31b-it handles text and image classification — cheap enough to
-// run on every submission. gemma-4-4b-it is used only for voice
+// run on every submission. gemini-3.6-flash is used only for voice
 // transcription because gemma-4-31b-it does not support audio input modality.
 const MODEL = 'gemma-4-31b-it';
 const AUDIO_MODEL = 'gemini-3.6-flash';
+
+// The language list Gemma is told to pick from. Kept here (not just in
+// ai.types.ts) since the prompt text needs the exact same set, spelled out
+// with enough context that the model can actually tell these apart rather
+// than defaulting everything ambiguous to "sw".
+const LANGUAGE_OPTIONS = [
+  '"en" (English)',
+  '"sw" (Kiswahili)',
+  '"sheng" (Sheng — Nairobi urban slang blending Swahili and English)',
+  '"ki" (Gikuyu)',
+  '"luo" (Dholuo)',
+  '"luy" (Luhya)',
+  '"kam" (Kikamba)',
+  '"kln" (Kalenjin)',
+  '"guz" (Ekegusii)',
+  '"mer" (Kimeru)',
+  '"mas" (Maa / Maasai)',
+  '"so" (Somali)',
+  '"tuv" (Turkana)',
+  '"other" (anything else, including languages not listed here)',
+].join(', ');
 
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly client = new GoogleGenAI({ apiKey: ENV.GEMINI_API_KEY });
-
 
   /**
    * Shared helper: sends a multi-part prompt, asks for raw JSON back, and
@@ -62,14 +82,37 @@ export class AiService {
     }
   }
 
-  async analyzeText(content: string): Promise<AiTextAnalysis> {
+  /**
+   * Builds the "category" instruction block for a prompt. `allowedCategories`
+   * is the dynamic vocabulary from CategoryDiscoveryService (seed categories
+   * plus any that have been promoted from recurring novel reports) — passing
+   * it lets Gemma reuse an already-discovered category consistently instead
+   * of re-describing the same theme with slightly different wording every
+   * time it comes up. If the caller doesn't pass one, this falls back to
+   * just the seed list.
+   */
+  private categoryInstruction(allowedCategories?: string[]): string {
+    const categories = allowedCategories?.length
+      ? allowedCategories
+      : REPORT_CATEGORIES;
+    return `one of these known categories: ${JSON.stringify(categories)} — OR, only if the report
+genuinely doesn't fit any of them (not just "other" being close enough), a short new lowercase
+category name in snake_case that names the actual recurring theme (e.g. "school_uniforms",
+"street_lighting"). Prefer an existing category whenever it reasonably fits — only propose a new
+one when you're confident this is a distinct, nameable issue, not a one-off oddity.`;
+  }
+
+  async analyzeText(
+    content: string,
+    allowedCategories?: string[],
+  ): Promise<AiTextAnalysis> {
     const prompt = `You are a civic-report classifier for WananchiAI, a Kenyan citizen reporting platform.
-Read the citizen report below (it may be in English, Kiswahili, or Sheng) and respond with ONLY a JSON object,
-no markdown fences, no commentary, matching this exact shape:
+Read the citizen report below (it may be in English, Kiswahili, Sheng, or another Kenyan language) and
+respond with ONLY a JSON object, no markdown fences, no commentary, matching this exact shape:
 {
   "translatedText": string | null,
-  "detectedLanguage": "en" | "sw" | "sheng" | "other",
-  "category": one of ${JSON.stringify(REPORT_CATEGORIES)},
+  "detectedLanguage": one of ${LANGUAGE_OPTIONS},
+  "category": ${this.categoryInstruction(allowedCategories)},
   "summary": string (max 2 sentences, in English),
   "sentiment": "positive" | "neutral" | "negative" | "urgent",
   "urgencyScore": number between 0 and 1,
@@ -98,15 +141,16 @@ Report:
     buffer: Buffer,
     mimetype: string,
   ): Promise<AiTranscriptionResult> {
-    const prompt = `Transcribe this citizen voice report verbatim. It may be spoken in English, Kiswahili, or Sheng —
-transcribe in whichever language(s) it was actually spoken, do not translate.
+    const prompt = `Transcribe this citizen voice report verbatim. It may be spoken in English, Kiswahili,
+Sheng, or another Kenyan language (Gikuyu, Dholuo, Luhya, Kikamba, Kalenjin, Ekegusii, Kimeru, Maa,
+Somali, Turkana, or others) — transcribe in whichever language(s) it was actually spoken, do not translate.
 Also listen for any specific place named in the recording — a county, constituency, ward, estate, market,
 road, or well-known landmark — and extract it, since many callers will name their location out loud
 instead of using a map picker.
 Respond with ONLY JSON, no markdown fences:
 {
   "transcript": string,
-  "detectedLanguage": "en" | "sw" | "sheng" | "other",
+  "detectedLanguage": one of ${LANGUAGE_OPTIONS},
   "mentionedLocation": { "name": string, "levelGuess": "county" | "constituency" | "ward" | "locality" | "area" | null } | null
 }
 Set "mentionedLocation" to null if no place is named in the recording — never guess.`;
@@ -126,6 +170,7 @@ Set "mentionedLocation" to null if no place is named in the recording — never 
     buffer: Buffer,
     mimetype: string,
     caption?: string,
+    allowedCategories?: string[],
   ): Promise<AiImageAnalysis> {
     const prompt = `Look at this photo submitted as a civic report${caption ? ` with caption: "${caption}"` : ''}.
 Describe the visible community issue (e.g. pothole, burst water pipe, uncollected garbage, damaged school block)
@@ -137,7 +182,7 @@ community issue.
 Respond with ONLY JSON, no markdown fences:
 {
   "description": string,
-  "category": one of ${JSON.stringify(REPORT_CATEGORIES)},
+  "category": ${this.categoryInstruction(allowedCategories)},
   "hasVisibleIssue": boolean,
   "isSpam": boolean,
   "spamScore": number between 0 and 1,
@@ -168,5 +213,53 @@ Respond with ONLY JSON, no markdown fences:
 { "summaryText": string, "topIssues": [{ "category": string, "count": number, "avgUrgency": number }] }`;
 
     return this.generateJson<AiDigestSummary>([{ text: prompt }]);
+  }
+
+  /**
+   * Resolves a free-text place name (informal settlement, estate, landmark,
+   * etc.) to its containing constituency. Used as a fallback only when
+   * ke-locations-data itself couldn't match the name directly — the returned
+   * name is NOT trusted as-is, the caller re-validates it against the
+   * package before using it.
+   */
+  async getExactConstituecy(name: string): Promise<{ name: string | null }> {
+    const prompt = `You are identifying Kenyan administrative divisions.
+
+Location mentioned: "${name}"
+
+Identify the National Assembly constituency (one of Kenya's 290 constituencies) that this location falls within. Use your knowledge of Kenya's official administrative boundaries, matching informal names (estates, informal settlements, landmarks, neighborhoods) to the constituency that officially contains them.
+
+Rules:
+- Return the constituency's official name only, exactly as it appears on Kenya's IEBC boundary list (e.g. "Kibra", "Westlands", "Kasarani").
+- Do not return a county, ward, or sub-location name — it must be a constituency.
+- If you are not confident which constituency this location belongs to, or the location is ambiguous/unrecognized, return null instead of guessing.
+
+Respond with ONLY raw JSON, no markdown code fences, no explanation:
+{"name": string | null}`;
+
+    return this.generateJson<{ name: string | null }>([{ text: prompt }]);
+  }
+
+  /**
+   * Resolves a free-text place name to its containing county. Same
+   * fallback contract as getExactConstituecy — output is re-validated
+   * against ke-locations-data by the caller, never trusted directly.
+   */
+  async getExactCounty(name: string): Promise<{ name: string | null }> {
+    const prompt = `You are identifying Kenyan administrative divisions.
+
+Location mentioned: "${name}"
+
+Identify the county (one of Kenya's 47 counties) that this location falls within. Use your knowledge of Kenya's official administrative boundaries, matching informal names (estates, informal settlements, landmarks, neighborhoods) to the county that officially contains them.
+
+Rules:
+- Return the county's official name only, exactly as used in Kenya's official county list (e.g. "Nairobi", "Mombasa", "Kiambu").
+- Do not return a constituency, ward, or sub-location name — it must be a county.
+- If you are not confident which county this location belongs to, or the location is ambiguous/unrecognized, return null instead of guessing.
+
+Respond with ONLY raw JSON, no markdown code fences, no explanation:
+{"name": string | null}`;
+
+    return this.generateJson<{ name: string | null }>([{ text: prompt }]);
   }
 }
