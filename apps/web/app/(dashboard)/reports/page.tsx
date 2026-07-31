@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ReportRow } from "@/components/dashboard/report-row";
 import type { ReportRowData } from "@/components/dashboard/report-row";
@@ -59,6 +59,9 @@ const CATEGORY_FILTERS: { value: CategoryFilter; label: string }[] = [
 
 const PAGE_SIZE = 20;
 
+// ---------------------------------------------------------------------------
+// Skeleton
+// ---------------------------------------------------------------------------
 function SkeletonRow() {
   return (
     <div className="animate-pulse flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
@@ -73,10 +76,26 @@ function SkeletonRow() {
   );
 }
 
+function PageSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="h-10 w-full rounded-xl bg-muted animate-pulse" />
+      <div className="flex gap-1.5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-7 w-20 rounded-xl bg-muted animate-pulse" />
+        ))}
+      </div>
+      <div className="space-y-2">
+        {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Page
+// Inner client component — uses useSearchParams, safe inside Suspense
 // ---------------------------------------------------------------------------
-export default function ReportsPage() {
+function ReportsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -84,7 +103,7 @@ export default function ReportsPage() {
   // Read location filters from URL
   const urlLocationType = searchParams.get("location_type") as LocationType | null;
   const urlLocationCode = searchParams.get("location_code");
-  const urlLocationName = searchParams.get("location_name"); // for display only
+  const urlLocationName = searchParams.get("location_name");
 
   const [status, setStatus]     = useState<StatusFilter>("all");
   const [category, setCategory] = useState<CategoryFilter>("all");
@@ -126,13 +145,10 @@ export default function ReportsPage() {
   const clearFilters = () => {
     setStatus("all"); setCategory("all");
     setSearch(""); setDebouncedSearch(""); setPage(1); setShowSpam(false);
-    // Clear location filter from URL
     if (hasLocationFilter) router.push(pathname);
   };
 
-  const clearLocationFilter = () => {
-    router.push(pathname);
-  };
+  const clearLocationFilter = () => router.push(pathname);
 
   return (
     <div className="space-y-4">
@@ -142,9 +158,7 @@ export default function ReportsPage() {
           <div className="flex items-start gap-2.5">
             <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
             <div className="flex-1">
-              <p className="text-xs font-semibold text-primary">
-                Filtered by location
-              </p>
+              <p className="text-xs font-semibold text-primary">Filtered by location</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {urlLocationName || urlLocationCode} · {urlLocationType}
               </p>
@@ -222,7 +236,6 @@ export default function ReportsPage() {
           )}
         </p>
         <div className="flex items-center gap-2">
-          {/* Spam toggle */}
           <button
             type="button"
             onClick={() => setShowSpam((v) => !v)}
@@ -288,5 +301,16 @@ export default function ReportsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page — wraps ReportsContent in Suspense so useSearchParams is valid
+// ---------------------------------------------------------------------------
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ReportsContent />
+    </Suspense>
   );
 }
