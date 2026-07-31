@@ -52,24 +52,28 @@ export function CategoryBar({ data, className }: CategoryBarProps) {
       </div>
 
       {/* Legend rows */}
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {data.map((item) => {
           const pct = Math.round((item.count / total) * 100);
           const { label, cls } = urgencyLabel(item.avgUrgency);
           return (
-            <div key={item.category} className="flex items-center gap-2.5">
+            <div key={item.category} className="flex items-center gap-2">
               <span
                 className={cn(
                   "size-2.5 shrink-0 rounded-sm",
                   CATEGORY_COLORS[item.category] ?? "bg-muted-foreground"
                 )}
               />
-              <span className="flex-1 text-xs capitalize text-card-foreground">{item.category}</span>
-              <span className={cn("text-[11px] font-medium", cls)}>{label}</span>
-              <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">
+              {/* category name — grows, truncates on tiny screens */}
+              <span className="min-w-0 flex-1 truncate text-xs capitalize text-card-foreground">
+                {item.category}
+              </span>
+              {/* urgency label hidden on very small screens to avoid overflow */}
+              <span className={cn("hidden text-[11px] font-medium sm:inline", cls)}>{label}</span>
+              <span className="shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
                 {pct}%
               </span>
-              <span className="w-10 text-right text-xs tabular-nums text-card-foreground">
+              <span className="w-10 shrink-0 text-right text-xs tabular-nums text-card-foreground">
                 {item.count.toLocaleString()}
               </span>
             </div>

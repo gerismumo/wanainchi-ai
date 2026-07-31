@@ -327,7 +327,7 @@ export default function SubmitPage() {
   if (submitted) return <SuccessScreen onReset={resetForm} />;
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 pb-10">
+    <div className="mx-auto max-w-xl space-y-5 pb-24 md:pb-10">
 
       {/* Info banner */}
       <div className="flex gap-2.5 rounded-xl border border-border bg-muted/50 p-3">

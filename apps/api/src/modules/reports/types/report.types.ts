@@ -1,4 +1,5 @@
 import { Report } from 'knex/types/tables';
+import { LocationRef } from 'src/common/util/location.util';
 
 export interface ReportWithCounts extends Report {
   vote_count?: string;
@@ -23,6 +24,7 @@ export interface ReportFilters {
   locationCode?: string;
   countyCode?: string;
   constituencyCode?: string;
+  locations?: LocationRef[];
   q?: string;
   includeSpam?: boolean;
 }

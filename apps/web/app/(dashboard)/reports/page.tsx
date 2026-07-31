@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ReportRow } from "@/components/dashboard/report-row";
 import type { ReportRowData } from "@/components/dashboard/report-row";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useReports } from "@/hooks/useReports";
-import { Loader2, AlertTriangle, RefreshCw, Search, X, ShieldAlert } from "lucide-react";
+import { Loader2, AlertTriangle, RefreshCw, Search, X, ShieldAlert, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import type { IReport, ReportStatus, ReportSentiment } from "@/types/reports.types";
+import type { IReport, ReportStatus } from "@/types/reports.types";
+import { LocationType } from "@/types/users.types";
 
 // ---------------------------------------------------------------------------
 // Adapter
@@ -75,6 +77,15 @@ function SkeletonRow() {
 // Page
 // ---------------------------------------------------------------------------
 export default function ReportsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Read location filters from URL
+  const urlLocationType = searchParams.get("location_type") as LocationType | null;
+  const urlLocationCode = searchParams.get("location_code");
+  const urlLocationName = searchParams.get("location_name"); // for display only
+
   const [status, setStatus]     = useState<StatusFilter>("all");
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [page, setPage]         = useState(1);
@@ -98,6 +109,8 @@ export default function ReportsPage() {
     category: category !== "all" ? category : undefined,
     q: debouncedSearch || undefined,
     include_spam: showSpam || undefined,
+    location_type: urlLocationType ?? undefined,
+    location_code: urlLocationCode ?? undefined,
   });
 
   useEffect(() => {
@@ -107,15 +120,46 @@ export default function ReportsPage() {
   const rows = (data?.items ?? []).map(toRowData);
   const totalPages = data?.meta.totalPages ?? 1;
   const total = data?.meta.total ?? 0;
-  const hasActiveFilters = status !== "all" || category !== "all" || debouncedSearch !== "" || showSpam;
+  const hasLocationFilter = !!urlLocationType && !!urlLocationCode;
+  const hasActiveFilters = status !== "all" || category !== "all" || debouncedSearch !== "" || showSpam || hasLocationFilter;
 
   const clearFilters = () => {
     setStatus("all"); setCategory("all");
     setSearch(""); setDebouncedSearch(""); setPage(1); setShowSpam(false);
+    // Clear location filter from URL
+    if (hasLocationFilter) router.push(pathname);
+  };
+
+  const clearLocationFilter = () => {
+    router.push(pathname);
   };
 
   return (
     <div className="space-y-4">
+      {/* Location filter banner */}
+      {hasLocationFilter && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <div className="flex items-start gap-2.5">
+            <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-primary">
+                Filtered by location
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {urlLocationName || urlLocationCode} · {urlLocationType}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearLocationFilter}
+              className="flex items-center gap-1 rounded-lg border border-primary/30 bg-background px-2 py-1 text-xs text-primary transition-colors hover:bg-primary/10"
+            >
+              <X className="size-3" /> Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Search bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />

@@ -100,6 +100,7 @@ export class ReportsRepository {
       locationCode,
       countyCode,
       constituencyCode,
+      locations,
       q,
       includeSpam,
     } = filters;
@@ -109,8 +110,24 @@ export class ReportsRepository {
       if (status) qb.andWhere('r.status', status);
       if (category) qb.andWhere('r.category', category);
       if (sentiment) qb.andWhere('r.sentiment', sentiment);
-      if (locationType) qb.andWhere('r.location_type', locationType);
-      if (locationCode) qb.andWhere('r.location_code', locationCode);
+      
+      // If expanded locations array is provided, use it for hierarchical filtering
+      if (locations && locations.length > 0) {
+        qb.andWhere((sub) => {
+          for (const loc of locations) {
+            sub.orWhere((inner) => {
+              inner
+                .where('r.location_type', loc.location_type)
+                .andWhere('r.location_code', loc.location_code);
+            });
+          }
+        });
+      } else {
+        // Fall back to legacy single-location filters
+        if (locationType) qb.andWhere('r.location_type', locationType);
+        if (locationCode) qb.andWhere('r.location_code', locationCode);
+      }
+      
       if (countyCode) qb.andWhere('r.county_code', countyCode);
       if (constituencyCode)
         qb.andWhere('r.constituency_code', constituencyCode);

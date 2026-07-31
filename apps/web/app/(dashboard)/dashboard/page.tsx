@@ -149,7 +149,7 @@ export default function DashboardPage() {
       {/* Main content grid */}
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* Recent reports */}
-        <div>
+        <div className="min-w-0">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground">Recent Reports</h2>
             <div className="flex items-center gap-3">
@@ -182,23 +182,25 @@ export default function DashboardPage() {
         </div>
 
         {/* Category sidebar */}
-        {catLoading ? (
-          <div className="animate-pulse rounded-xl border border-border bg-card p-5">
-            <div className="mb-4 h-4 w-40 rounded bg-muted" />
-            <div className="mb-4 h-3 w-full rounded-full bg-muted" />
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="mb-2 flex items-center gap-2">
-                <div className="size-2.5 rounded-sm bg-muted" />
-                <div className="h-3 flex-1 rounded bg-muted" />
-                <div className="h-3 w-10 rounded bg-muted" />
-              </div>
-            ))}
-          </div>
-        ) : catError ? (
-          <ErrorBlock message="Could not load categories." onRetry={() => retryCategories()} />
-        ) : categoryItems.length > 0 ? (
-          <CategoryBar data={categoryItems} />
-        ) : null}
+        <div className="min-w-0">
+          {catLoading ? (
+            <div className="animate-pulse rounded-xl border border-border bg-card p-5">
+              <div className="mb-4 h-4 w-40 rounded bg-muted" />
+              <div className="mb-4 h-3 w-full rounded-full bg-muted" />
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="mb-2 flex items-center gap-2">
+                  <div className="size-2.5 rounded-sm bg-muted" />
+                  <div className="h-3 flex-1 rounded bg-muted" />
+                  <div className="h-3 w-10 rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+          ) : catError ? (
+            <ErrorBlock message="Could not load categories." onRetry={() => retryCategories()} />
+          ) : categoryItems.length > 0 ? (
+            <CategoryBar data={categoryItems} />
+          ) : null}
+        </div>
       </div>
     </div>
   );

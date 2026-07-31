@@ -351,7 +351,7 @@ export default function DigestDetailPage({
             Explore
           </p>
           <Link
-            href={`/reports?location_type=${digest.location_type}&location_code=${digest.location_code}`}
+            href={`/reports?location_type=${encodeURIComponent(digest.location_type)}&location_code=${encodeURIComponent(digest.location_code)}&location_name=${encodeURIComponent(digest.location_name ?? "this location")}`}
             className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 transition-colors hover:bg-muted"
           >
             <FileText className="size-4 shrink-0 text-muted-foreground" />
@@ -360,7 +360,7 @@ export default function DigestDetailPage({
                 Browse reports from {digest.location_name ?? "this location"}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Filter the full report feed for this {digest.location_type}
+                View all {digest.report_count.toLocaleString()} reports from this {digest.location_type}
               </p>
             </div>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />

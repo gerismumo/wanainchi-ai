@@ -69,18 +69,19 @@ export function ReportRow({ report, className }: ReportRowProps) {
     <Link
       href={`/reports/${report.id}`}
       className={cn(
-        "group flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/50",
+        "group flex items-start gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/50",
         className
       )}
     >
       {/* Type icon */}
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted mt-0.5">
         <TypeIcon className="size-3.5 text-muted-foreground" />
       </div>
 
       {/* Main content */}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        {/* Row 1: category + status badges */}
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-semibold capitalize text-card-foreground">
             {report.category}
           </span>
@@ -98,29 +99,29 @@ export function ReportRow({ report, className }: ReportRowProps) {
             </span>
           )}
         </div>
+
+        {/* Row 2: summary */}
         <p className="truncate text-xs text-muted-foreground">{report.summary}</p>
-      </div>
 
-      {/* Location */}
-      <div className="hidden items-center gap-1 sm:flex">
-        <MapPin className="size-3 shrink-0 text-muted-foreground" />
-        <span className="max-w-28 truncate text-[11px] text-muted-foreground">
-          {report.locationName}
-        </span>
-      </div>
-
-      {/* Urgency + sentiment */}
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <div className="flex items-center gap-1.5">
-          <span className={cn("size-2 rounded-full", SENTIMENT_DOT[report.sentiment])} />
-          <span className="text-[11px] tabular-nums text-muted-foreground">
-            {Math.round(report.urgencyScore * 100)}%
-          </span>
+        {/* Row 3: location + meta — always visible, wraps on mobile */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+          <div className="flex items-center gap-1">
+            <MapPin className="size-3 shrink-0 text-muted-foreground" />
+            <span className="max-w-40 truncate text-[11px] text-muted-foreground">
+              {report.locationName}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className={cn("size-2 rounded-full shrink-0", SENTIMENT_DOT[report.sentiment])} />
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {Math.round(report.urgencyScore * 100)}%
+            </span>
+          </div>
+          <span className="text-[10px] text-muted-foreground">{timeAgo(report.createdAt)}</span>
         </div>
-        <span className="text-[10px] text-muted-foreground">{timeAgo(report.createdAt)}</span>
       </div>
 
-      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground mt-1 opacity-0 transition-opacity group-hover:opacity-100" />
     </Link>
   );
 }

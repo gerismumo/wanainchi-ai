@@ -6,7 +6,7 @@ import { AiService } from '../ai/ai.service';
 import { DevicesService, DeviceContext } from '../devices/devices.service';
 import { StorageUpload } from '../storage/storage.upload';
 import { AbuseLogsRepository } from '../abuse-logs/abuse-logs.repository';
-import { resolveLocation, resolveLocationByName, ResolvedLocation } from 'src/common/util/location.util';
+import { resolveLocation, resolveLocationByName, ResolvedLocation, expandLocationCodes } from 'src/common/util/location.util';
 import { CreateMediaReportDto, CreateTextReportDto, LocationInputDto, ReportQueryDto } from './dto/report.dto';
 import { PaginatedResult } from 'src/common/util/pagination.util';
 import { ReportPublic } from './types/report.types';
@@ -215,6 +215,13 @@ export class ReportsService {
   }
 
   async getPaginated(query: ReportQueryDto): Promise<PaginatedResult<ReportPublic>> {
+    // If location filter is provided, expand it to include all child locations
+    let locations: ReturnType<typeof expandLocationCodes> | undefined;
+    
+    if (query.location_type && query.location_code) {
+      locations = expandLocationCodes(query.location_type, query.location_code);
+    }
+        
     const result = await this.repo.findPaginated({
       page: query.page,
       limit: query.limit,
@@ -225,6 +232,7 @@ export class ReportsService {
       locationCode: query.location_code,
       countyCode: query.county_code,
       constituencyCode: query.constituency_code,
+      locations: locations && locations.length > 0 ? locations : undefined,
       q: query.q,
       includeSpam: query.include_spam ?? false,
     });
