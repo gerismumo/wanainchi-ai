@@ -322,7 +322,7 @@ export default function ReportDetailPage({
         )}
 
         {/* Full text content */}
-        {report.content_text && (
+        {report.type === 'text' && report.content_text && (
           <div className="mt-4">
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
               Original report
