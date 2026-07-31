@@ -202,11 +202,13 @@ All routes are prefixed with `/api`.
 
 ## Docker
 
-### Development (infrastructure only)
+### Development
+
+`docker-compose.dev.yml` runs the full local stack — Postgres, MinIO, the API, and the web app.
 
 ```bash
-# Start Postgres + MinIO
-docker compose -f docker-compose.dev.yml up -d
+# Build and start everything
+docker compose -f docker-compose.dev.yml up -d --build
 
 # Stop
 docker compose -f docker-compose.dev.yml down
@@ -214,6 +216,13 @@ docker compose -f docker-compose.dev.yml down
 # Wipe volumes (fresh start)
 docker compose -f docker-compose.dev.yml down -v
 ```
+
+The API and web services read their env from `apps/api/.env` and `apps/web/.env` respectively — make sure you've created both files from the `.env.example` templates before running `up`.
+
+> If you prefer running the apps outside Docker (hot-reload with `pnpm dev`), just start the infrastructure services only:
+> ```bash
+> docker compose -f docker-compose.dev.yml up -d postgres minio
+> ```
 
 ### Production
 
