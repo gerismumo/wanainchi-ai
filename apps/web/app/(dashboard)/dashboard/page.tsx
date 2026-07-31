@@ -108,14 +108,14 @@ export default function DashboardPage() {
           description: "auto-flagged by AI",
           changeType: "neutral" as const,
         },
-        {
-          title: "Resolved",
-          value: overview.resolvedReports.toLocaleString(),
-          change: resolutionRate ? `${resolutionRate}%` : undefined,
-          changeType: "up" as const,
-          icon: CheckCircle,
-          description: "resolution rate",
-        },
+        // {
+        //   title: "Resolved",
+        //   value: overview.resolvedReports.toLocaleString(),
+        //   change: resolutionRate ? `${resolutionRate}%` : undefined,
+        //   changeType: "up" as const,
+        //   icon: CheckCircle,
+        //   description: "resolution rate",
+        // },
       ]
     : null;
 

@@ -193,7 +193,7 @@ function ReportsContent() {
       </div>
 
       {/* Status filters */}
-      <div className="-mx-4 px-4 md:mx-0 md:px-0">
+      {/* <div className="-mx-4 px-4 md:mx-0 md:px-0">
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {STATUS_FILTERS.map(({ value, label }) => (
             <button key={value} type="button" onClick={() => setStatus(value)}
@@ -207,7 +207,7 @@ function ReportsContent() {
             </button>
           ))}
         </div>
-      </div>
+      </div> */}
 
       {/* Category filters */}
       <div className="-mx-4 px-4 md:mx-0 md:px-0">
