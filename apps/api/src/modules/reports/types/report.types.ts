@@ -12,6 +12,10 @@ export interface ReportPublic extends Omit<Report, 'embedding_id' | 'urgency_sco
   spam_score: number | null;
   vote_count: number;
   comment_count: number;
+  /** True when Gemma successfully enriched this report; false means the AI
+   *  call failed and the report was saved with default fallback values.
+   *  Derived from confidence_score > 0 — no schema change required. */
+  ai_enriched: boolean;
 }
 
 export interface ReportFilters {

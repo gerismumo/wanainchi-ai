@@ -63,7 +63,7 @@ function PhotoPreview({ file, onRemove }: { file: File; onRemove: () => void }) 
 // ---------------------------------------------------------------------------
 // Success screen
 // ---------------------------------------------------------------------------
-function SuccessScreen({ onReset }: { onReset: () => void }) {
+function SuccessScreen({ onReset, aiEnriched }: { onReset: () => void; aiEnriched: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center gap-5 py-20 text-center">
       <div className="relative flex size-16 items-center justify-center rounded-full bg-emerald-500/10">
@@ -73,10 +73,21 @@ function SuccessScreen({ onReset }: { onReset: () => void }) {
       <div>
         <h2 className="text-xl font-semibold text-foreground">Report received</h2>
         <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-          Gemma 4 will classify and cluster your report. A community digest is
-          generated once enough similar reports arrive in your area.
+          {aiEnriched
+            ? "Gemma 4 classified and clustered your report. A community digest is generated once enough similar reports arrive in your area."
+            : "Your report was saved successfully."}
         </p>
       </div>
+
+      {!aiEnriched && (
+        <div className="flex max-w-sm items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
+          <Info className="mt-0.5 size-4 shrink-0 text-amber-500" />
+          <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+            AI classification was unavailable when your report was submitted (model unavailable). It has been saved and will be reviewed manually. Classification may be added later.
+          </p>
+        </div>
+      )}
+
       <Button variant="outline" size="sm" onClick={onReset} className="gap-1.5">
         <RotateCcw className="size-3.5" />
         Submit another report
@@ -183,6 +194,7 @@ function CategoryPicker({
 export default function SubmitPage() {
   const [type, setType]         = useState<SubmitType>("text");
   const [submitted, setSubmitted] = useState(false);
+  const [aiEnriched, setAiEnriched] = useState(true);
   const [content, setContent]   = useState("");
   const [language, setLanguage] = useState<ReportLanguage>("en");
   const [category, setCategory] = useState("");
@@ -298,18 +310,21 @@ export default function SubmitPage() {
       }
       const r = await createText.execute({ content_text: content, language, ...locationFields });
       if (!r.success) { toast.error("Failed to submit", { description: r.message }); return; }
+      setAiEnriched(r.data?.ai_enriched ?? true);
     }
 
     if (type === "voice") {
       if (!file) { toast.error("No audio", { description: "Record or upload a voice note." }); return; }
       const r = await createVoice.execute(locationFields, file);
       if (!r.success) { toast.error("Failed to submit", { description: r.message }); return; }
+      setAiEnriched(r.data?.ai_enriched ?? true);
     }
 
     if (type === "photo") {
       if (!file) { toast.error("No photo", { description: "Take or upload a photo." }); return; }
       const r = await createPhoto.execute({ caption: content || undefined, ...locationFields }, file);
       if (!r.success) { toast.error("Failed to submit", { description: r.message }); return; }
+      setAiEnriched(r.data?.ai_enriched ?? true);
     }
 
     setSubmitted(true);
@@ -317,10 +332,10 @@ export default function SubmitPage() {
 
   const resetForm = () => {
     setSubmitted(false); setContent(""); setFile(null);
-    setCategory(""); setLocation(null); setType("text");
+    setCategory(""); setLocation(null); setType("text"); setAiEnriched(true);
   };
 
-  if (submitted) return <SuccessScreen onReset={resetForm} />;
+  if (submitted) return <SuccessScreen onReset={resetForm} aiEnriched={aiEnriched} />;
 
   return (
     <div className="mx-auto max-w-xl space-y-5 pb-24 md:pb-10">

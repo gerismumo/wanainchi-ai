@@ -27,6 +27,9 @@ export interface IReport {
   status: ReportStatus;
   vote_count: number;
   comment_count: number;
+  /** True when Gemma successfully classified this report; false means the AI
+   *  call failed and the report was saved with default fallback values. */
+  ai_enriched: boolean;
   created_at: string;
   updated_at: string;
 
