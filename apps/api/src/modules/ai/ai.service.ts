@@ -12,13 +12,14 @@ import {
 // gemma-4-31b-it handles text and image classification — cheap enough to
 // run on every submission. gemma-4-4b-it is used only for voice
 // transcription because gemma-4-31b-it does not support audio input modality.
-const MODEL       = 'gemma-4-31b-it';
-const AUDIO_MODEL = 'gemma-4-4b-it';
+const MODEL = 'gemma-4-31b-it';
+const AUDIO_MODEL = 'gemini-3.6-flash';
 
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly client = new GoogleGenAI({ apiKey: ENV.GEMINI_API_KEY });
+
 
   /**
    * Shared helper: sends a multi-part prompt, asks for raw JSON back, and
@@ -28,7 +29,9 @@ export class AiService {
    * silently returning a fallback that hides the real problem.
    */
   private async generateJson<T>(
-    parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>,
+    parts: Array<
+      { text: string } | { inlineData: { mimeType: string; data: string } }
+    >,
     model = MODEL,
   ): Promise<T> {
     let text = '{}';
@@ -40,12 +43,22 @@ export class AiService {
       });
       text = response.text ?? '{}';
       return JSON.parse(text) as T;
-    } catch (error) {
-      const msg = (error as Error).message;
-      this.logger.error(`AI call failed (model=${model}): ${msg}`);
-      // Re-throw so controllers / services can decide whether to propagate
-      // the error to the HTTP client or apply their own graceful fallback.
-      throw new Error(`AI processing failed: ${msg}`);
+    } catch (error: any) {
+      let message: any = 'Unknown AI error';
+
+      try {
+        const parsed = JSON.parse(error.message);
+        message = parsed?.error?.message ?? error.message;
+
+        // Keep only the first sentence
+        message = message.split('\n')[0];
+      } catch {
+        message = error.message || String(error);
+      }
+
+      this.logger.error(`AI call failed (model=${model}): ${message}`);
+
+      throw new Error(message);
     }
   }
 
@@ -81,7 +94,10 @@ Report:
     return this.generateJson<AiTextAnalysis>([{ text: prompt }]);
   }
 
-  async transcribeVoice(buffer: Buffer, mimetype: string): Promise<AiTranscriptionResult> {
+  async transcribeVoice(
+    buffer: Buffer,
+    mimetype: string,
+  ): Promise<AiTranscriptionResult> {
     const prompt = `Transcribe this citizen voice report verbatim. It may be spoken in English, Kiswahili, or Sheng —
 transcribe in whichever language(s) it was actually spoken, do not translate.
 Also listen for any specific place named in the recording — a county, constituency, ward, estate, market,
@@ -95,7 +111,7 @@ Respond with ONLY JSON, no markdown fences:
 }
 Set "mentionedLocation" to null if no place is named in the recording — never guess.`;
 
-        // Using Gemma 4's native multimodal capabilities 
+    // Using Gemma 4's native multimodal capabilities
     // to process audio directly, ensuring a unified Gemma-powered pipeline.
     return this.generateJson<AiTranscriptionResult>(
       [
@@ -106,7 +122,11 @@ Set "mentionedLocation" to null if no place is named in the recording — never 
     );
   }
 
-  async analyzeImage(buffer: Buffer, mimetype: string, caption?: string): Promise<AiImageAnalysis> {
+  async analyzeImage(
+    buffer: Buffer,
+    mimetype: string,
+    caption?: string,
+  ): Promise<AiImageAnalysis> {
     const prompt = `Look at this photo submitted as a civic report${caption ? ` with caption: "${caption}"` : ''}.
 Describe the visible community issue (e.g. pothole, burst water pipe, uncollected garbage, damaged school block)
 in one factual sentence, classify it, and say whether an actual issue is visibly present in the photo.
